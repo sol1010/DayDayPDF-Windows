@@ -1,0 +1,105 @@
+{
+  "generatedBy": "npm run vendor:windows",
+  "files": [
+    {
+      "path": "fontkit/1.1.1/fontkit.umd.min.js",
+      "bytes": 758440,
+      "sha256": "d8df561b9fba98e24f2e5130e40948809281bbbc55a20c412359f1a0a5eb35a6"
+    },
+    {
+      "path": "fontkit/1.1.1/package.json",
+      "bytes": 2278,
+      "sha256": "42b7a756ea4c11abfa664ffe9f9b67c1e30e564b5e2fb6db5b1775dac3eabb35"
+    },
+    {
+      "path": "fonts/NanumGothic-Bold.ttf",
+      "bytes": 2073868,
+      "sha256": "f96298f9fb18e364d2370f4c3ce948ac67a2b61af992d7234bc15c42b033c674"
+    },
+    {
+      "path": "fonts/NanumGothic-Regular.ttf",
+      "bytes": 2054744,
+      "sha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31"
+    },
+    {
+      "path": "fonts/NanumMyeongjo-Bold.ttf",
+      "bytes": 3074720,
+      "sha256": "bc9ed8e60d93fe6db054b8fb988481b625f2eef8cb2317ad0e9834681b8fe3f3"
+    },
+    {
+      "path": "fonts/NanumMyeongjo-Regular.ttf",
+      "bytes": 3058408,
+      "sha256": "7ed9e8653a8ed04285d51dc343ffea6eb3d9c73afc27383ea8929ee4ffd03205"
+    },
+    {
+      "path": "fonts/NanumPenScript-Regular.ttf",
+      "bytes": 3201664,
+      "sha256": "6f0d1ab29c7894010dc88831fb7a0a51edb79136e450344183de5b1a8b52bd43"
+    },
+    {
+      "path": "fonts/NotoSansKR-wght.ttf",
+      "bytes": 10414588,
+      "sha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252"
+    },
+    {
+      "path": "fonts/Roboto-wdth-wght.ttf",
+      "bytes": 488584,
+      "sha256": "d7598e12c5dbef095ff8272cfc55da0250bd07fbdecbac8a530b9b277872a134"
+    },
+    {
+      "path": "fonts/RobotoSlab-wght.ttf",
+      "bytes": 251880,
+      "sha256": "786ae192477447d33c6672c3055fba7cbfe45184c9a79e77a14f15716ca05b16"
+    },
+    {
+      "path": "fonts/SpoqaHanSansBold.ttf",
+      "bytes": 1107568,
+      "sha256": "d0db86432b9103757de76ac26f87ac132a11b3dd523f5681473549838e530aba"
+    },
+    {
+      "path": "fonts/SpoqaHanSansRegular.ttf",
+      "bytes": 1164064,
+      "sha256": "811804cc0ce832deca80edd7da35bed7c695749a4851eef5554ff136368fc570"
+    },
+    {
+      "path": "pdf-lib/1.17.1/LICENSE.md",
+      "bytes": 1070,
+      "sha256": "f2c9fc00fdb66eb99ac156ba52d734af66d8d309f65753ae809ad34ee2883bcb"
+    },
+    {
+      "path": "pdf-lib/1.17.1/package.json",
+      "bytes": 6148,
+      "sha256": "951726fe11b7376919050c18d2cd9237d6e211d7ee0b01104990cb95105fe182"
+    },
+    {
+      "path": "pdf-lib/1.17.1/pdf-lib.min.js",
+      "bytes": 525099,
+      "sha256": "0f9a5cad07941f0826586c94e089d89b918c46e5c17cf2d5a3c6f666e3bc694f"
+    },
+    {
+      "path": "pdfium/2.15.0/LICENSE",
+      "bytes": 1075,
+      "sha256": "f5031b66adba8ef5ef57666deff980a7f2ccff5c8a8c22a8117e854d2b8dfcd3"
+    },
+    {
+      "path": "pdfium/2.15.0/LICENSE.pdfium",
+      "bytes": 12880,
+      "sha256": "b033ffb8fc19c23ca81f7e98019ab658cc6f4cf14587c7c6a2a67fb0f6ac0f5a"
+    },
+    {
+      "path": "pdfium/2.15.0/index.browser.js",
+      "bytes": 293211,
+      "sha256": "d3686595d8c147f9702384afa6f6489d3a91aee3b701ab25464102e80d1c9f24"
+    },
+    {
+      "path": "pdfium/2.15.0/package.json",
+      "bytes": 2399,
+      "sha256": "e699a8b606b5ceae9f0e8a3bc4974aed413e62186e1e3f9cdb8f22d6a9f3b904"
+    },
+    {
+      "path": "pdfium/2.15.0/pdfium.wasm",
+      "bytes": 4633788,
+      "sha256": "c0af5a6aca30d7e54a149c3a68e317116ca906d6edc28fd3318b12c7d9478ac8"
+    }
+  ]
+}

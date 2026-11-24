@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>PdfEditor.Preview</AssemblyName>
+    <RootNamespace>PdfEditor.Preview</RootNamespace>
+    <Version>$(PreviewPackageVersion)</Version>
+    <AssemblyVersion>$(PreviewPackageVersion)</AssemblyVersion>
+    <FileVersion>$(PreviewPackageVersion)</FileVersion>
+    <InformationalVersion>$(PreviewChannel) $(PreviewDisplayVersion)</InformationalVersion>
+    <ApplicationIcon>..\App.ico</ApplicationIcon>
+    <DefineConstants>$(DefineConstants);PDF_EDITOR_PREVIEW</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\PrintInbox.cs" Link="PrintInbox.cs" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="..\App.ico" Link="Assets\App.ico" />
+    <Content Include="WebApp\view.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="WebApp\assets\editor-tools\**\*;WebApp\assets\qpdf\**\*;WebApp\assets\ocr\**\*;WebApp\licenses\**\*;WebApp\THIRD_PARTY_NOTICES.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\assets\pdfjs\6.2.108\**\*" Link="WebApp\assets\pdfjs\6.2.108\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\assets\windows-vendor\**\*" Link="WebApp\assets\windows-vendor\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

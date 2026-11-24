@@ -1,0 +1,266 @@
+ 
+.dialog .row.themeOptions {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: stretch;
+}
+.themeOptions > label { grid-column: 1 / -1; margin-bottom: 2px; }
+.themeOptions .themeOpt {
+  appearance: none; min-width: 0; min-height: 82px; padding: 8px 4px;
+  background: transparent; font-family: inherit; line-height: 1.4; word-break: keep-all;
+}
+.themeOpt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.themeOpt:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.themeOpt :is(.tPrev, .bar, .pg) { display: block; }
+ 
+.dialog .glassEffectChoice {
+  position: relative; display: flex; align-items: center; gap: 16px; width: auto;
+  padding: 12px 14px; margin: 6px 0 18px; border: 1px solid var(--border); border-radius: 10px;
+  background: transparent; color: var(--text); cursor: pointer;
+}
+.glassEffectText { flex: 1; min-width: 0; }
+.glassEffectText strong { display: block; font-size: 12.5px; font-weight: 600; }
+.glassEffectText small { display: block; margin-top: 4px; color: var(--dim); font-size: 11.5px; line-height: 1.5; }
+.glassEffectChoice input {
+  position: absolute; right: 14px; width: 42px; height: 26px; margin: 0; opacity: 0; cursor: pointer;
+}
+.glassEffectTrack {
+  flex: 0 0 42px; height: 26px; border-radius: 20px; background: var(--border);
+  border: 1px solid color-mix(in srgb, var(--dim) 20%, transparent); pointer-events: none;
+}
+.glassEffectTrack::after {
+  content: ''; display: block; width: 20px; height: 20px; margin: 2px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px #0003;
+}
+.glassEffectChoice input:checked + .glassEffectTrack { background: #2c9765; border-color: #2c9765; }
+.glassEffectChoice input:checked + .glassEffectTrack::after { transform: translateX(16px); }
+.glassEffectChoice input:focus-visible + .glassEffectTrack { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+ 
+:root[data-glass] {
+  color-scheme: light;
+  --bg: #edf0f2; --panel: #f6f6f8; --panel2: #eaeaee;
+  --border: #30343b1a; --text: #222326; --dim: #62656c;
+  --accent: #0067d7; --accent2: #0064d2; --cur: #627f9c;
+  --danger: #b93931; --ok: #287c47;
+  --glass-opaque: #f6f6f8;
+  --glass-surface-translucent: rgba(250, 251, 253, .38);
+  --glass-dialog-translucent: rgba(250, 251, 253, .62);
+  --glass-surface: var(--glass-opaque); --glass-dialog: var(--glass-opaque);
+  --glass-blur: 24px; --glass-dialog-blur: 32px;
+  --glass-filter: none; --glass-dialog-filter: none;
+  --glass-shine: linear-gradient(135deg, #ffffff80, #ffffff0a 46%, #ffffff33);
+  --glass-tint: linear-gradient(115deg, #e3e9dd24, #dbe8ff18 38%, #ebdcff24 70%, #ffe0ed2b);
+  --glass-shadow: 0 24px 70px #35344c1f, 0 4px 14px #35344c0d,
+    inset 0 1px 0 #fffffff2, inset 0 -1px 0 #ffffff66;
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root[data-glass] {
+    --glass-surface: var(--glass-surface-translucent);
+    --glass-dialog: var(--glass-dialog-translucent);
+    --glass-filter: blur(var(--glass-blur)) saturate(125%);
+    --glass-dialog-filter: blur(var(--glass-dialog-blur)) saturate(130%);
+  }
+}
+:root[data-glass] body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+  isolation: isolate;
+  background: var(--bg);
+  --glass-pools-cool:
+    radial-gradient(ellipse at 46% 34%, #fffffff2 0%, #ffffff70 28%, #ffffff00 62%),
+    radial-gradient(ellipse at 2% 22%, #cbd6c38c 0%, #cbd6c300 49%),
+    radial-gradient(ellipse at 80% -12%, #b4d5f8b3 0%, #b4d5f800 53%);
+  --glass-pools-warm:
+    radial-gradient(ellipse at 104% 54%, #f1bfd58c 0%, #f1bfd500 49%),
+    radial-gradient(ellipse at 74% 110%, #cbb5ed99 0%, #cbb5ed00 55%),
+    radial-gradient(ellipse at -8% 102%, #c7dffa80 0%, #c7dffa00 48%);
+}
+ 
+:root[data-glass] body::before,
+:root[data-glass] body::after {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  transform: scale(1.08); transform-origin: center;
+}
+:root[data-glass] body::before {
+  background: var(--glass-pools-warm);
+  animation: glass-pools-warm 54s ease-in-out infinite;
+}
+:root[data-glass] body::after {
+  background: var(--glass-pools-cool);
+  animation: glass-pools-cool 42s ease-in-out infinite;
+}
+@keyframes glass-pools-warm {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.08); }
+  34% { transform: translate3d(-2.5%, 1.5%, 0) scale(1.12, 1.09); }
+  68% { transform: translate3d(1.5%, -2%, 0) scale(1.09, 1.13); }
+}
+@keyframes glass-pools-cool {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.08); }
+  38% { transform: translate3d(2%, -1.5%, 0) scale(1.1, 1.12); }
+  72% { transform: translate3d(-1.5%, 2%, 0) scale(1.12, 1.09); }
+}
+:root[data-glass] :is(#main, #viewer) { background: transparent; }
+:root[data-glass] :is(#toolbar, #tabbar, #statusbar, #sidebar, #searchBar) {
+  background: var(--glass-shine), var(--glass-tint), var(--glass-surface);
+  -webkit-backdrop-filter: var(--glass-filter); backdrop-filter: var(--glass-filter);
+  border-color: var(--border);
+  box-shadow: inset 0 1px 0 #ffffffb3;
+}
+:root[data-glass] #toolbar { padding-block: 7px; }
+ 
+:root[data-glass] #toolbar { --text: #60646c; color: var(--text); }
+:root[data-theme="dark"][data-glass] #toolbar { --text: #c0c7d2; }
+:root[data-glass] #sidebar { border-right: 1px solid var(--border); }
+:root[data-glass] #sideGrip { background: #30343b09; }
+:root[data-glass] #sideGrip:hover { background: #30343b26; }
+:root[data-glass] #tabbar { border-bottom-color: #ffffffb3; }
+:root[data-glass] .dtab.active {
+  background: #ffffffb3; border-color: #30343b14; color: var(--text);
+  box-shadow: 0 2px 6px #22263008, inset 0 1px 0 #fff;
+}
+:root[data-glass] .dtab:hover:not(.active) { background: #ffffff73; }
+:root[data-glass] .pageWrap { box-shadow: 0 10px 32px #22263012, 0 1px 4px #2226300a; }
+:root[data-glass] .thumb.selected {
+  background: #ffffff80; border-color: #7f8c9a4d; border-radius: 12px;
+  box-shadow: 0 3px 10px #2226300a, inset 0 1px 0 #ffffffcc;
+}
+:root[data-glass] .thumb.current { outline-color: var(--cur); }
+:root[data-glass] .overlay { background: #30344514; }
+:root[data-glass] :is(.dialog, #ctxMenu, #tabMenu, #shapeMenu, #objMenu,
+  #textBar, #shapeTextBar, #drawingBar, #regionBar, #palettePop, #tabList, .fontPicker, .dayday-language-menu,
+  #btnReaderChrome, #mobileButtonTip, #desktopTabTip) {
+  background: var(--glass-shine), var(--glass-tint), var(--glass-dialog);
+  -webkit-backdrop-filter: var(--glass-dialog-filter); backdrop-filter: var(--glass-dialog-filter);
+  border-color: #ffffffcc; color: var(--text); box-shadow: var(--glass-shadow);
+}
+:root[data-glass] .dialog { border-radius: 24px; }
+:root[data-glass] :is(#ctxMenu, #tabMenu, #objMenu, .fontPicker, .dayday-language-menu) { border-radius: 16px; }
+:root[data-glass] .setSide { background: #ffffff24; }
+:root[data-glass] .setMain { background: transparent; }
+:root[data-glass] #setOverlay .setFooter { background: #ffffff30; }
+:root[data-glass] #setOverlay .setFooter > [hidden] { display: none; }
+:root[data-glass] :is(.themeOpt.sel, .toolbarDisplayChoice:has(input:checked)) {
+  background: #ffffff9e; border-color: #77859473;
+  box-shadow: 0 3px 10px #2226300a, inset 0 1px 0 #fff;
+}
+:root[data-glass] :is(.setNavBtn, .toolbarDisplayChoice, .themeOpt) { border-radius: 12px; }
+:root[data-glass] .setNavBtn.active {
+  background: #ffffffb3; color: var(--text); box-shadow: 0 2px 7px #2226300f, inset 0 1px 0 #fff;
+}
+:root[data-glass] :is(.btn.active, #toolbar .btn.active) {
+  background: #0067d710; border-color: #0067d726; color: var(--accent);
+}
+:root[data-glass] .btn.primary {
+  background: var(--accent2); border-color: transparent; color: #fff;
+  box-shadow: 0 2px 6px #0064d21a;
+}
+:root[data-glass] :is(.btn, .sbtn, #btnThumbs, #btnTabList) { border-radius: 10px; }
+:root[data-glass] :is(.btn, #btnThumbs, #btnTabList):hover:not(:disabled) {
+  background-color: #30343b0a; border-color: #30343b24;
+}
+:root[data-glass] .btn.primary:hover:not(:disabled) { background: #0059bd; color: #fff; }
+:root[data-glass] .btn.danger:hover:not(:disabled) { background: #b93931; color: #fff; }
+:root[data-glass] :is(.sbtn.vm.active, #betaTag) {
+  background: #ffffff80; border-color: #30343b12;
+}
+:root[data-glass] :is(.dialog input[type=text], .dialog input[type=password],
+  .dialog input.keycap, .dialog select, #zoomInput, #pageJump, #searchBar input) {
+  background: #ffffffa6; border-color: #30343b21; color: var(--text); border-radius: 9px;
+}
+:root[data-glass] :is(.toolbarSizeOptions, .toolbarStylePreview) { background: #7676800f; }
+:root[data-glass] .toolbarSizeOptions { border-color: transparent; border-radius: 12px; }
+:root[data-glass] .dialog .toolbarSizeOptions .toolbarDisplayChoice:has(input:checked) {
+  background: #fff; border-color: #30343b0a; color: var(--text); box-shadow: 0 2px 5px #22263014;
+}
+:root[data-glass] :is(#ctxMenu, #tabMenu, #objMenu, #shapeMenu) .mi:hover,
+:root[data-glass] .dayday-language-menu button:hover {
+  background: #30343b0a; color: var(--text);
+}
+:root[data-glass] :is(select option, #prOverlay input[type=number]) {
+  background: #f6f6f8; color: var(--text); color-scheme: light;
+}
+:root[data-glass] :is(button, input, select, [tabindex]):focus-visible {
+  outline: 2px solid #0067d799; outline-offset: 2px;
+}
+:root[data-glass] #toast {
+  background: #f9f9fbed; color: var(--text); border: 1px solid #ffffffcc;
+  box-shadow: var(--glass-shadow);
+}
+:root[data-glass] :is(.keyConflict, #setKeyConflictSummary) { color: var(--danger); }
+ 
+:root[data-theme="dark"][data-glass] {
+  color-scheme: dark;
+  --bg: #171b22; --panel: #252a34; --panel2: #303743;
+  --border: #ffffff1a; --text: #eef1f7; --dim: #c0c7d2;
+  --accent: #99c1ff; --accent2: #2865ce; --cur: #9baecd;
+  --danger: #ff9b96; --ok: #83d8a7;
+  --glass-opaque: #252a34;
+  --glass-surface-translucent: rgba(28, 32, 41, .46);
+  --glass-dialog-translucent: rgba(28, 32, 40, .78);
+  --glass-shine: linear-gradient(135deg, #ffffff12, #ffffff02 46%, #ffffff06);
+  --glass-tint: linear-gradient(115deg, #72949a08, #7084a008 38%, #9586ad08 70%, #99838f06);
+  --glass-shadow: 0 24px 70px #080b146b, 0 4px 14px #080b1429,
+    inset 0 1px 0 #ffffff26, inset 0 -1px 0 #ffffff08;
+}
+:root[data-theme="dark"][data-glass] body {
+  --glass-pools-cool:
+    radial-gradient(ellipse at 46% 34%, #b9c4d40a 0%, #b9c4d400 62%),
+    radial-gradient(ellipse at 1% 26%, #43878c4d 0%, #43878c00 53.5%),
+    radial-gradient(ellipse at 84% -2%, #43619864 0%, #43619800 56%);
+  --glass-pools-warm:
+    radial-gradient(ellipse at 102% 55%, #855c7339 0%, #855c7300 51.5%),
+    radial-gradient(ellipse at 76% 103%, #705c9753 0%, #705c9700 57.5%),
+    radial-gradient(ellipse at -4% 101%, #4a6d9245 0%, #4a6d9200 51%);
+}
+:root[data-theme="dark"][data-glass] :is(#toolbar, #tabbar, #statusbar, #sidebar, #searchBar) {
+  border-color: #ffffff1a; box-shadow: inset 0 1px 0 #ffffff1a;
+}
+:root[data-theme="dark"][data-glass] #sideGrip { background: #ffffff09; }
+:root[data-theme="dark"][data-glass] #sideGrip:hover { background: #ffffff26; }
+:root[data-theme="dark"][data-glass] .dtab.active { background: #ffffff12; border-color: var(--border); box-shadow: inset 0 1px 0 #ffffff14; }
+:root[data-theme="dark"][data-glass] .dtab:hover:not(.active) { background: #ffffff09; }
+:root[data-theme="dark"][data-glass] .pageWrap { box-shadow: 0 10px 32px #0003, 0 1px 4px #0002; }
+:root[data-theme="dark"][data-glass] .thumb.selected { background: #ffffff0c; border-color: #a5bad973; box-shadow: inset 0 1px 0 #ffffff14; }
+:root[data-theme="dark"][data-glass] .overlay { background: #070a1433; }
+:root[data-theme="dark"][data-glass] :is(.dialog, #ctxMenu, #tabMenu, #shapeMenu, #objMenu,
+  #textBar, #shapeTextBar, #drawingBar, #regionBar, #palettePop, #tabList, .fontPicker, .dayday-language-menu,
+  #btnReaderChrome, #mobileButtonTip, #desktopTabTip) { border-color: #ffffff30; }
+:root[data-theme="dark"][data-glass] .setSide { background: #0000000c; }
+:root[data-theme="dark"][data-glass] #setOverlay .setFooter { background: #ffffff04; }
+:root[data-theme="dark"][data-glass] :is(.themeOpt.sel, .toolbarDisplayChoice:has(input:checked)) {
+  background: #ffffff12; border-color: #a5bad973; box-shadow: 0 2px 7px #0002, inset 0 1px 0 #ffffff14;
+}
+:root[data-theme="dark"][data-glass] .setNavBtn.active { background: #ffffff12; box-shadow: 0 2px 7px #0002, inset 0 1px 0 #ffffff14; }
+:root[data-theme="dark"][data-glass] :is(.btn.active, #toolbar .btn.active) { background: #8db8ff1f; border-color: #a3c6ff47; color: var(--accent); }
+:root[data-theme="dark"][data-glass] :is(.btn, #btnThumbs, #btnTabList):hover:not(:disabled) { background-color: #ffffff0e; border-color: #ffffff30; }
+:root[data-theme="dark"][data-glass] .btn.primary:hover:not(:disabled) { background: #3475e5; color: #fff; }
+:root[data-theme="dark"][data-glass] .btn.danger:hover:not(:disabled) { background: #b93931; color: #fff; }
+:root[data-theme="dark"][data-glass] :is(.sbtn.vm.active, #betaTag) { background: #ffffff0c; border-color: var(--border); }
+:root[data-theme="dark"][data-glass] :is(.dialog input[type=text], .dialog input[type=password],
+  .dialog input.keycap, .dialog select, #zoomInput, #pageJump, #searchBar input) { background: #10141b40; border-color: #ffffff26; }
+:root[data-theme="dark"][data-glass] :is(.toolbarSizeOptions, .toolbarStylePreview) { background: #0000001f; }
+:root[data-theme="dark"][data-glass] .dialog .toolbarSizeOptions .toolbarDisplayChoice:has(input:checked) {
+  background: #ffffff14; border-color: var(--border); box-shadow: 0 2px 7px #0002, inset 0 1px 0 #ffffff14;
+}
+:root[data-theme="dark"][data-glass] :is(#ctxMenu, #tabMenu, #objMenu, #shapeMenu) .mi:hover,
+:root[data-theme="dark"][data-glass] .dayday-language-menu button:hover { background: #ffffff0e; color: var(--text); }
+:root[data-theme="dark"][data-glass] :is(select option, #prOverlay input[type=number]) { background: var(--glass-opaque); color-scheme: dark; }
+:root[data-theme="dark"][data-glass] :is(button, input, select, [tabindex]):focus-visible { outline-color: #99c1ffaa; }
+:root[data-theme="dark"][data-glass] #toast { background: #252a34f2; border-color: #ffffff30; }
+
+@media (max-width: 768px) {
+  :root[data-glass] { --glass-blur: 16px; --glass-dialog-blur: 22px; }
+  :root[data-glass] .dialog { border-radius: 22px; }
+}
+@media (prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce) {
+  :root[data-glass] body::before,
+  :root[data-glass] body::after { animation: none; transform: none; }
+}
+@media print {
+  :root[data-glass] body::before,
+  :root[data-glass] body::after { display: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-glass] {
+    --glass-surface: var(--glass-opaque); --glass-dialog: var(--glass-opaque);
+    --glass-filter: none; --glass-dialog-filter: none;
+  }
+}

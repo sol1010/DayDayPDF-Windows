@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko" data-editor-mode="desktop-view">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self' blob: https://pc-fonts.daydaypdf.invalid; worker-src 'self' blob:; frame-src blob:; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<meta name="pdf-editor-version" content="__APP_VER__">
+
+<meta name="theme-color" content="#1e2227">
+<title>PDF 편집기</title>
+<link rel="modulepreload" href="assets/pdfjs/6.2.108/legacy/build/pdf.min.mjs">
+<script src="assets/windows-vendor/pdf-lib/1.17.1/pdf-lib.min.js"
+  integrity="sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI" crossorigin="anonymous"></script>
+<script src="assets/windows-vendor/fontkit/1.1.1/fontkit.umd.min.js"
+  integrity="sha384-2p6U+1mmqF10USehFeRiyG2ESG9FwIqN+jxULn5w9jjQIihSn9Pt13dVCn/Hawjn" crossorigin="anonymous"></script>
+<style>
+/*__PDF_EDITOR_STYLES__*/</style>
+</head>
+<body>
+
+<div id="appBootSplash" role="status" aria-live="polite" aria-label="DaydayPDF 불러오는 중">
+  <div class="appBootBrand">
+    <!--__DAYDAYPDF_WORDMARK__-->
+    <div class="appBootProgress" aria-hidden="true"><span></span></div>
+    <div id="appBootStatus"></div>
+  </div>
+</div>
+
+<div class="desktopResizeZone desktopResizeLeft" data-edge="left" aria-hidden="true"></div>
+<div class="desktopResizeZone desktopResizeRight" data-edge="right" aria-hidden="true"></div>
+<div class="desktopResizeZone desktopResizeBottom" data-edge="bottom" aria-hidden="true"></div>
+<div class="desktopResizeZone desktopResizeBottomLeft" data-edge="bottom-left" aria-hidden="true"></div>
+<div class="desktopResizeZone desktopResizeBottomRight" data-edge="bottom-right" aria-hidden="true"></div>
+
+<div id="toolbar">
+  <a class="btn icon" id="btnHome" href="https://dayday.kr/" target="_blank" rel="noopener noreferrer" title="DaydayPDF 홈" aria-label="DaydayPDF 홈"><!--__DAYDAYPDF_WORDMARK__--></a>
+  <button class="btn" id="btnOpen" title="파일 열기"><i class="fal fa-folder-open" aria-hidden="true"></i><span class="lbl"> 열기</span></button>
+  <button class="btn" id="btnSave" title="저장" disabled><i class="fal fa-save" aria-hidden="true"></i><span class="lbl"> 저장</span></button>
+  <button class="btn" id="btnSaveAs" title="다른 이름으로 저장 (Ctrl+Shift+S)" disabled><i class="fal fa-file-export" aria-hidden="true"></i><span class="lbl"> 다른 이름으로</span></button>
+  <button class="btn" id="btnPrint" title="인쇄" disabled><i class="fal fa-print" aria-hidden="true"></i><span class="lbl"> 인쇄</span></button>
+  <button class="btn icon" id="btnUndo" title="실행 취소" disabled><i class="fal fa-undo" aria-hidden="true"></i><span class="lbl">실행 취소</span></button>
+  <button class="btn icon" id="btnRedo" title="다시 실행" disabled><i class="fal fa-redo" aria-hidden="true"></i><span class="lbl">다시 실행</span></button>
+  <div class="sep"></div>
+  <button class="btn" id="btnBlank" title="빈페이지 추가" disabled><i class="fal fa-file-plus" aria-hidden="true"></i><span class="lbl"> 빈 페이지</span></button>
+  <button class="btn" id="btnRotL" title="왼쪽 회전" disabled><i class="fal fa-undo-alt" aria-hidden="true"></i><span class="lbl">왼쪽 회전</span></button>
+  <button class="btn" id="btnRotR" title="오른쪽 회전" disabled><i class="fal fa-redo-alt" aria-hidden="true"></i><span class="lbl">오른쪽 회전</span></button>
+  <div class="sep"></div>
+  <button class="btn" id="btnText" title="텍스트 추가" disabled><i class="fal fa-text" aria-hidden="true"></i><span class="lbl"> 텍스트</span></button>
+  <button class="btn" id="btnShape" title="도형 삽입" disabled><i class="fal fa-shapes" aria-hidden="true"></i><span class="lbl"> 도형</span></button>
+  <button class="btn" id="btnConnectArrow" title="도형에 연결 화살표 추가" disabled aria-label="도형에 연결 화살표 추가">
+    <svg class="toolbarConnectorIcon" viewBox="0 0 18 18" aria-hidden="true">
+      <rect x="1.5" y="4.5" width="8" height="9" rx=".7"></rect>
+      <path d="M9.5 9h7M13.5 6l3 3-3 3"></path>
+    </svg><span class="lbl"> 연결 화살표</span>
+  </button>
+  <button class="btn" id="btnOrig" title="편집 모드" disabled><i class="fal fa-edit" aria-hidden="true"></i><span class="lbl"> 편집</span></button>
+  <button class="btn" id="btnDraw" data-editor-only title="그리기 (D)" aria-label="그리기" aria-pressed="false" disabled><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 8-9a2 2 0 0 1 3 3l-9 8-4 1 2-3ZM11.5 4.5l3 3M3 18c3-3 5 2 8-1s4 1 6-1"/></svg><span class="lbl">그리기</span></button>
+  <button class="btn" id="btnRegion" title="범위 복사 (Alt+C) — 드래그한 영역을 이미지로 복사" disabled aria-label="범위 복사">
+    <svg class="toolbarRegionCopyIcon" viewBox="0 0 18 18" aria-hidden="true">
+      <rect class="regionSelectFrame" x="1.5" y="1.5" width="11" height="11" rx=".8"></rect>
+      <path d="M7 12.5v3h8.5V7h-3"></path>
+    </svg><span class="lbl"> 범위복사</span>
+  </button>
+  <button class="btn" id="btnSearch" title="검색" disabled><i class="fal fa-search" aria-hidden="true"></i><span class="lbl">검색</span></button>
+  <div class="sep"></div>
+  <button class="btn" id="btnPdfLock" aria-label="PDF 암호 설정" title="PDF 암호 설정" disabled><svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="3.5" y="8" width="11" height="8" rx="1.5"/><path d="M6 8V5a3 3 0 0 1 6 0v3M9 11v2"/></svg><span class="lbl">암호 설정</span></button>
+  <button class="btn" id="btnPdfUnlock" aria-label="PDF 암호 해제" title="PDF 암호 해제" disabled hidden><svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="3.5" y="8" width="11" height="8" rx="1.5"/><path d="M6 8V5a3 3 0 0 1 6-1M9 11v2"/></svg><span class="lbl">암호 해제</span></button>
+  <button class="btn" id="btnDocumentTools" aria-label="OCR·문서·이미지 변환" title="OCR·문서·이미지 변환"><i class="fal fa-exchange-alt" aria-hidden="true"></i><span class="lbl"> 변환</span></button>
+  <button class="btn" id="btnAppend" title="PDF 병합" disabled><i class="fal fa-layer-plus" aria-hidden="true"></i><span class="lbl"> 병합</span></button>
+  <span class="toolbarSpacer" aria-hidden="true"></span>
+  <button class="btn" id="btnSettings" title="설정"><i class="fal fa-cog" aria-hidden="true"></i><span class="lbl">설정</span></button>
+  <span id="betaTag" title="베타 — 자주 업데이트됩니다">BETA <b id="appVer" data-i18n-ignore translate="no">__APP_VER__</b></span>
+</div>
+
+<div id="drawingBar" data-editor-only role="region" aria-label="그리기 옵션" hidden>
+  <div class="drawingControls">
+    <label>붓 <select data-ink-brush aria-label="붓 종류"><option value="pen">펜</option><option value="pencil">연필</option><option value="marker">마커</option><option value="highlighter">형광펜</option><option value="eraser">부분 지우개</option></select></label>
+    <label hidden>모양 <select data-eraser-tip aria-label="지우개 모양"><option value="round">원형</option><option value="soft">부드러운 원형</option><option value="square">사각형</option><option value="chisel">납작 사선형</option></select></label>
+    <label>두께 <input data-ink-width type="number" min="0.1" max="40" step="0.5" value="2.5" inputmode="decimal" aria-label="붓 두께 (pt)" title="붓 두께 · 휠로 조절"><span class="inkUnit">pt</span></label>
+    <label>색상 <button type="button" class="swBtn" id="inkColor" data-ink-color data-col="#243d51" aria-label="붓 색상" title="붓 색상"></button></label>
+    <label class="inkOpacity">투명도 <input data-ink-opacity type="range" min="5" max="100" step="5" value="100" aria-label="붓 불투명도"><output>100%</output></label>
+    <span class="inkPreview" data-ink-preview aria-hidden="true"></span>
+    <span class="drawingHint"><span>완료 후 그린 선을 선택해 이동·수정할 수 있습니다.</span><span class="drawingTouchHint">두 손가락으로 화면 이동·확대/축소</span></span>
+  </div>
+  <button type="button" data-ink-done title="그리기 완료 (Esc)">완료</button>
+</div>
+
+
+<div id="lockBar" role="alert">
+  <span aria-hidden="true">🔒</span>
+  <span class="lockMsg">편집 제한이 있는 파일입니다. 암호를 입력하세요. — 해제 전에는 편집·저장을 사용할 수 없습니다</span>
+  <button class="btn primary" id="lockBarUnlock">암호 입력</button>
+  <button class="lockClose" id="lockBarClose" title="경고 닫기">×</button>
+</div>
+
+
+<div id="windowsAccessBar" role="status" aria-live="polite">
+  <i class="fal fa-wifi-slash" aria-hidden="true"></i>
+  <span id="windowsAccessMessage"></span>
+</div>
+
+<div id="tabbar">
+  <button id="btnThumbs" title="썸네일 패널 표시/숨김 (F4)"><i class="fal fa-border-all" aria-hidden="true"></i></button>
+  <div id="tabStrip"></div>
+  <button id="btnTabList" title="열린 문서 목록"><i class="fal fa-list" aria-hidden="true"></i><span id="tabCount">0</span></button>
+</div>
+<div id="tabList" aria-label="열린 문서 목록"></div>
+
+<div id="main">
+  <div id="sidebar"></div>
+  <div id="sideGrip" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="sidebar" aria-label="드래그하여 패널 폭 조절" title="드래그하여 패널 폭 조절"></div>
+  <div id="viewer" style="position:relative">
+    <div id="pagesBox"></div>
+    <div id="dropHint">
+      <div class="big"><i class="fal fa-file-pdf" aria-hidden="true"></i></div>
+      <div class="t1">PDF 파일을 끌어다 놓거나 [열기]를 누르세요</div>
+      <div>여러 파일을 한 번에 끌어놓으면 각각 탭으로 열립니다 (Ctrl+드롭 = 현재 문서 끝에 추가)</div>
+      <div>보기 · 병합 · 분할/추출 · 삭제 · 회전 · 순서변경 · 크기변경 · 텍스트</div>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">
+  <span id="stFile">파일 없음</span>
+  <span id="stSel"></span>
+  <button class="sbtn vm" data-vm="scroll" title="연속 스크롤 보기"><i class="fal fa-stream" aria-hidden="true"></i> 연속</button>
+  <button class="sbtn vm" data-vm="single" title="한 장 보기 — 드래그/스크롤로 페이지 이동"><i class="fal fa-file" aria-hidden="true"></i> 1장</button>
+  <button class="sbtn vm" data-vm="double" title="두 장 보기"><i class="fal fa-columns" aria-hidden="true"></i> 2장</button>
+  <span class="grow"></span>
+  <div id="pageNavigator" class="pageNavigator" role="group" aria-label="페이지">
+    <button class="sbtn pageNavButton" id="pgPrev" title="이전 페이지" aria-label="이전 페이지" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button>
+    <div class="pageNavCounter"><input class="pageNavInput" id="pageJump" inputmode="numeric" title="페이지 번호 입력 후 Enter" aria-label="페이지" disabled><span aria-hidden="true">/</span><span class="pageNavTotal" id="pageTotal">-</span></div>
+    <button class="sbtn pageNavButton" id="pgNext" title="다음 페이지" aria-label="다음 페이지" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button>
+  </div>
+  <span class="grow"></span>
+  <button class="sbtn" id="btnZoomOut" title="축소 (Ctrl+휠)" disabled><i class="fal fa-search-minus" aria-hidden="true"></i></button>
+  <input id="zoomInput" type="number" min="25" max="5000" step="5" value="100" inputmode="decimal" title="확대·축소 배율 입력" aria-label="확대·축소 배율" disabled>
+  <span id="zoomPct">%</span>
+  <button class="sbtn" id="btnZoomIn" title="확대 (Ctrl+휠)" disabled><i class="fal fa-search-plus" aria-hidden="true"></i></button>
+  <button class="sbtn" id="btnFitPage" title="현재 페이지 전체를 화면에 맞춤" disabled><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true" style="vertical-align:-2px"><path d="M5 2H2v3M11 2h3v3M2 11v3h3M14 11v3h-3"/><rect x="5" y="4" width="6" height="8" rx=".5"/></svg> 화면 맞춤</button>
+  <button class="sbtn" id="btnFit" title="폭 맞춤" disabled><i class="fal fa-arrows-alt-h" aria-hidden="true"></i> 폭맞춤</button>
+</div>
+
+<!--__PDF_EDITOR_TOOLS_TEMPLATE__--><!--__PDF_EDITOR_DIALOGS_TEMPLATE__--><iframe id="printFrame" style="position:fixed; right:0; bottom:0; width:1px; height:1px; border:0; visibility:hidden"></iframe>
+
+<div id="spinner"><div class="ring"></div><div id="spinnerMsg" style="color:#fff">처리 중...</div></div>
+<div id="toast"></div>
+<input type="file" id="fileInput" accept="application/pdf,.pdf" multiple style="display:none">
+
+<script type="module">
+/*__PDF_EDITOR_APP__*/
+</script>
+</body>
+</html>

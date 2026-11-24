@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <PreviewPackageVersion>26.11.24.3</PreviewPackageVersion>
+    <PreviewDisplayVersion>26.11.24.3</PreviewDisplayVersion>
+    <PreviewChannel>PC</PreviewChannel>
+    <Deterministic>true</Deterministic>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
+    <PathMap>$(MSBuildThisFileDirectory)=/_/windows/</PathMap>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+</Project>

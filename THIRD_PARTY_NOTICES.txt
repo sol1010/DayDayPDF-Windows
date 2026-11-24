@@ -1,0 +1,95 @@
+DayDayPDF for Windows
+=====================
+
+DayDayPDF code and its original toolbar icons are licensed under GPL-3.0-only.
+Source: https://github.com/sol1010/DayDayPDF-Windows
+The following components retain their upstream licenses and notices.
+
+PDF.js 6.2.108
+----------------
+용도: PDF 해석, 화면 렌더링, 텍스트 및 주석 추출
+라이선스: Apache License 2.0
+프로젝트: https://github.com/mozilla/pdf.js/tree/v6.2.108
+로컬 라이선스 원문: assets/pdfjs/6.2.108/LICENSE.txt
+
+배포에 포함되는 PDF.js 보조 데이터와 디코더의 개별 고지는 다음 경로에 원문 그대로 보존됩니다.
+- assets/pdfjs/6.2.108/cmaps/LICENSE
+- assets/pdfjs/6.2.108/iccs/LICENSE
+- assets/pdfjs/6.2.108/standard_fonts/LICENSE_FOXIT
+- assets/pdfjs/6.2.108/standard_fonts/LICENSE_LIBERATION
+- assets/pdfjs/6.2.108/wasm/LICENSE_JBIG2
+- assets/pdfjs/6.2.108/wasm/LICENSE_OPENJPEG
+- assets/pdfjs/6.2.108/wasm/LICENSE_QCMS
+- assets/pdfjs/6.2.108/wasm/LICENSE_PDFJS_JBIG2
+- assets/pdfjs/6.2.108/wasm/LICENSE_PDFJS_OPENJPEG
+- assets/pdfjs/6.2.108/wasm/LICENSE_PDFJS_QCMS
+
+QuickJS와 pdf.js.quickjs 샌드박스 (MIT)
+- assets/pdfjs/6.2.108/wasm/LICENSE_QUICKJS
+- assets/pdfjs/6.2.108/wasm/LICENSE_PDFJS_QUICKJS
+- 고지 출처 https://github.com/mozilla/pdf.js/tree/a3beacc1a35f2d285f0505c5489d8cb4a9ebcc89/external/quickjs
+
+
+pdf-lib 1.17.1
+----------------
+용도: PDF 생성 및 저장
+라이선스: MIT License
+프로젝트 및 라이선스: https://github.com/Hopding/pdf-lib/tree/v1.17.1
+
+
+@pdf-lib/fontkit 1.1.1
+----------------------
+용도: PDF 글꼴 임베딩
+라이선스: MIT License
+패키지 및 라이선스: https://www.npmjs.com/package/@pdf-lib/fontkit/v/1.1.1
+
+
+@embedpdf/pdfium 2.15.0 및 PDFium
+----------------------------------
+용도: 원본 PDF 콘텐츠 편집
+JavaScript/WASM 래퍼: MIT License
+포함된 PDFium 및 제3자 구성요소: Apache License 2.0, BSD 계열 등 각 upstream 고지 적용
+프로젝트: https://www.npmjs.com/package/@embedpdf/pdfium/v/2.15.0
+PDFium 고지: https://pdfium.googlesource.com/pdfium/+/refs/heads/main/LICENSE
+
+
+
+문서에 포함할 수 있는 글꼴
+--------------------------
+Windows 설치본에는 아래 글꼴이 포함됩니다. PC에 설치한 다른 글꼴은 로컬에서 조회합니다. PDF에 글꼴을 포함할 때는 해당 글꼴의 임베딩 권한과 서브세팅 제한을 적용합니다.
+
+- Spoqa Han Sans 3.3.0: SIL Open Font License 1.1
+  https://github.com/spoqa/spoqa-han-sans/tree/3.3.0
+- Noto Sans KR: SIL Open Font License 1.1
+  https://github.com/google/fonts/tree/main/ofl/notosanskr
+- Nanum Gothic, Nanum Myeongjo, Nanum Pen Script: SIL Open Font License 1.1
+  https://github.com/google/fonts/tree/main/ofl
+- Roboto: SIL Open Font License 1.1
+  https://github.com/google/fonts/tree/main/ofl/roboto
+- Roboto Slab: Apache License 2.0
+  https://github.com/google/fonts/tree/main/apache/robotoslab
+
+
+배포 시 유의사항
+----------------
+- 위 저작권·라이선스 고지를 배포본과 함께 유지합니다.
+- 각 프로젝트 링크의 라이선스 원문과 저작권 고지를 우선합니다.
+- 제3자 구성요소를 수정해 배포할 경우 해당 라이선스가 요구하는 수정 고지를 추가합니다.
+- 제3자 구성요소의 라이선스는 사용자가 편집하는 PDF 문서의 소유권이나 라이선스를 변경하지 않습니다.
+
+
+OCR / 문서 변환 및 PDF 프린터
+--------------------------------
+Tesseract.js / Core 7.0.0 (Apache-2.0), tessdata_best kor/eng (Apache-2.0), fflate 0.8.3 (MIT), Spoqa Han Sans 3.3.0 (OFL-1.1).
+전체 원문 및 정적 의존성 고지: licenses/document-tools/NOTICES.txt
+Windows Microsoft Print To PDF는 설치된 운영체제 구성요소를 사용하며 제품에 드라이버를 재배포하지 않습니다.
+본 제품은 한컴의 HWP 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다.
+
+PC PDF 암호 설정·해제
+QPDF WASM: Apache License 2.0
+qpdf-run 0.2.1: MIT License, Copyright (c) 2026 CrabPDF contributors
+동봉 고지: licenses/document-tools/qpdf-apache-2.0.txt, qpdf-NOTICE.txt, qpdf-run-MIT.txt
+인쇄 수신기는 Windows 기본 Microsoft Print To PDF 드라이버와 .NET API를 사용합니다. 외부 PDF 변환 프로그램이나 별도 프린터 드라이버를 포함하지 않습니다.
+
+Microsoft.Web.WebView2 SDK: BSD-3-Clause. See WebView2-SDK-LICENSE.txt and WebView2-SDK-NOTICE.txt in assets/windows-vendor/licenses.
+.NET and Windows Desktop runtime notices are in assets/windows-vendor/licenses/dotnet-*.

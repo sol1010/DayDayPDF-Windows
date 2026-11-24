@@ -1,0 +1,8 @@
+.dayday-language-menu{position:fixed;z-index:2147483000;min-width:172px;max-width:calc(100vw - 16px);padding:6px;background:#242a30;color:#edf1f5;border:1px solid #444e59;border-radius:10px;box-shadow:0 8px 28px #0005;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+.dayday-language-menu button{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:40px;gap:22px;padding:8px 12px;border:0;border-radius:6px;color:inherit;background:transparent;text-align:left;font:inherit;cursor:pointer;white-space:nowrap}
+.dayday-language-menu button::after{content:"";width:14px;flex:none}
+.dayday-language-menu button[aria-checked="true"]::after{content:"✓";color:#87b7ff}
+.dayday-language-menu button:hover,.dayday-language-menu button:focus-visible{background:#ffffff12;outline:2px solid transparent}
+.dayday-language-menu button:focus-visible{outline-color:#679df4;outline-offset:-2px}
+html[data-theme="light"] .dayday-language-menu,body.light .dayday-language-menu{background:#fff;color:#222b34;border-color:#d4dbe3;box-shadow:0 8px 28px #152a4026}
+html[data-theme="light"] .dayday-language-menu button:hover,body.light .dayday-language-menu button:hover{background:#edf2f8}

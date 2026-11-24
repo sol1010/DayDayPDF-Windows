@@ -1,0 +1,115 @@
+ 
+#toolbar {
+  --toolbar-button-height: 26px; --toolbar-button-width: 28px; --toolbar-language-size: 11px;
+  --toolbar-icon-size: 16px; --toolbar-glyph-size: 14px;
+  --toolbar-label-height: 44px; --toolbar-label-size: 11px; --toolbar-label-width: 44px;
+}
+html[data-toolbar-size="medium"] #toolbar {
+  --toolbar-language-size: 13px;
+  --toolbar-button-height: 36px; --toolbar-button-width: 38px;
+  --toolbar-icon-size: 20px; --toolbar-glyph-size: 18px;
+  --toolbar-label-height: 54px; --toolbar-label-size: 12px; --toolbar-label-width: 52px;
+}
+html[data-toolbar-size="large"] #toolbar {
+  --toolbar-language-size: 15px;
+  --toolbar-button-height: 46px; --toolbar-button-width: 48px;
+  --toolbar-icon-size: 24px; --toolbar-glyph-size: 22px;
+  --toolbar-label-height: 64px; --toolbar-label-size: 12px; --toolbar-label-width: 60px;
+}
+html:is([data-toolbar-size="medium"], [data-toolbar-size="large"]) #toolbar .btn {
+  height: var(--toolbar-button-height); width: auto; min-width: var(--toolbar-button-width);
+}
+html:is([data-toolbar-size="medium"], [data-toolbar-size="large"]) #toolbar .btn > svg:not(.daydaypdfLogo) {
+  width: var(--toolbar-icon-size); height: var(--toolbar-icon-size);
+}
+html:is([data-toolbar-size="medium"], [data-toolbar-size="large"]) #toolbar .btn > i {
+  width: var(--toolbar-icon-size); font-size: var(--toolbar-glyph-size);
+}
+ 
+html[data-toolbar-display="labels"] #toolbar .btn { height: var(--toolbar-label-height); }
+html[data-toolbar-display="labels"] #toolbar .btn > .lbl {
+  display: block; font-size: var(--toolbar-label-size); line-height: 1.2; text-align: center;
+}
+html[data-toolbar-display="labels"] #toolbar .btn:has(> .lbl) {
+  flex-direction: column; width: auto; min-width: var(--toolbar-label-width); padding: 5px 8px; gap: 4px;
+}
+html[data-toolbar-display="labels"] #toolbar .btn > :is(svg:not(.daydaypdfLogo), i) {
+  width: var(--toolbar-icon-size); height: var(--toolbar-icon-size); line-height: var(--toolbar-icon-size);
+}
+html[data-toolbar-display="labels"] #toolbar .btn > i {
+  font-size: var(--toolbar-glyph-size);
+}
+#toolbar .btn > :is(svg, i) { flex-shrink: 0; }
+#toolbar > .dayday-language-toggle {
+  width: auto; min-width: var(--toolbar-button-width); height: var(--toolbar-button-height);
+  margin: 0; padding: 0 6px; border-radius: 6px;
+}
+#toolbar .dayday-language-code {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: var(--toolbar-icon-size); height: var(--toolbar-icon-size); flex-shrink: 0;
+  font: 600 var(--toolbar-language-size)/1 system-ui, sans-serif; letter-spacing: 0;
+}
+#toolbar > .toolbarSpacer { flex: 1 0 48px; min-width: 48px; }
+#toolbar #btnSettings { margin-left: 16px; }
+#toolbar > .dayday-language-toggle + #btnSettings { margin-left: 8px; }
+#toolbar :is(#btnPdfUnlock, #btnSave, #btnSaveAs)[hidden], #closeDocOverlay #closeDocSave[hidden] { display: none !important; }
+#toolbar > .dayday-language-toggle:hover { color: var(--text); }
+@media (max-width: 768px) {
+  #toolbar { --toolbar-button-height: 30px; --toolbar-button-width: 30px; }
+}
+.toolbarDisplaySetting { border: 0; padding: 0; margin: 18px 0 0; min-width: 0; }
+.toolbarDisplaySetting legend { color: var(--dim); font-size: 12px; padding: 0; margin-bottom: 8px; }
+.toolbarDisplayOptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; max-width: 440px; }
+.dialog .toolbarDisplayChoice {
+  position: relative; display: flex; align-items: center; min-width: 0; width: auto;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--panel); color: var(--text); font-size: 12px; cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+.toolbarDisplayChoice:hover { border-color: var(--dim); }
+.toolbarDisplayChoice:has(input:checked) { border-color: var(--accent); }
+.toolbarDisplayChoice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+ 
+.toolbarDisplayChoice input {
+  position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%;
+  padding: 0; margin: 0; opacity: 0; cursor: pointer;
+}
+.toolbarSizeOptions {
+  grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 3px;
+  border: 1px solid var(--border); border-radius: 7px; background: var(--bg);
+}
+.dialog .toolbarSizeOptions .toolbarDisplayChoice {
+  justify-content: center; min-height: 34px; padding: 6px 4px; border-color: transparent;
+  border-radius: 4px; background: transparent; color: var(--dim); text-align: center;
+}
+.toolbarSizeOptions .toolbarDisplayChoice:hover { color: var(--text); }
+.dialog .toolbarSizeOptions .toolbarDisplayChoice:has(input:checked) {
+  background: var(--panel2); border-color: var(--border); color: var(--text);
+  box-shadow: 0 1px 2px #0001;
+}
+.dialog .toolbarStyleChoice { flex-direction: column; align-items: stretch; padding: 0; }
+.toolbarStylePreview {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center;
+  min-height: 72px; padding: 12px; gap: 4px; border-radius: 6px 6px 0 0;
+  border-bottom: 1px solid var(--border); background: var(--panel2);
+}
+.toolbarPreviewTool { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-width: 0; }
+.toolbarPreviewTool i { width: 18px; font-size: 16px; line-height: 18px; text-align: center; }
+.toolbarPreviewTool small { font-size: 10px; line-height: 12px; white-space: nowrap; }
+.toolbarStyleCaption { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 38px; padding: 8px 12px; }
+.toolbarChoiceCheck { width: 15px; height: 15px; flex: none; color: var(--accent); opacity: 0; }
+.toolbarStyleChoice:has(input:checked) .toolbarChoiceCheck { opacity: 1; }
+@media (max-width: 480px) {
+  .toolbarDisplayOptions { gap: 8px; }
+  .toolbarSizeOptions { gap: 3px; }
+  .toolbarStylePreview { padding-inline: 8px; }
+  .toolbarStyleCaption { padding-inline: 9px; font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dialog .toolbarDisplayChoice { transition: none; }
+}
+@media (max-width: 480px) {
+  .setPane > .row:has(.themeOpt) { display: grid; grid-template-columns: 60px repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .setPane .themeOpt { min-width: 0; text-align: center; }
+  .setPane .themeOpt .tPrev { max-width: 100%; }
+}

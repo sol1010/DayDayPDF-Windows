@@ -1,0 +1,554 @@
+<Window x:Class="PdfEditor.Preview.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:PdfEditor.Preview"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="PDF 편집기 Preview"
+        Icon="pack://application:,,,/Assets/App.ico"
+        Width="1280"
+        Height="820"
+        MinWidth="{x:Static local:WindowSizePolicy.MinimumWidth}"
+        MinHeight="{x:Static local:WindowSizePolicy.MinimumHeight}"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        Background="#FFFFFF"
+        AllowDrop="True"
+        PreviewDragOver="OnWindowDragOver"
+        PreviewDrop="OnWindowDrop"
+        StateChanged="OnWindowStateChanged">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="37"
+                            ResizeBorderThickness="8"
+                            CornerRadius="9"
+                            GlassFrameThickness="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="ChromeBackgroundBrush" Color="#1E2227" />
+        <SolidColorBrush x:Key="ChromeTabBrush" Color="#292E35" />
+        <SolidColorBrush x:Key="ChromeSelectedTabBrush" Color="#334252" />
+        <SolidColorBrush x:Key="ChromeActiveTabBrush" Color="#262B31" />
+        <SolidColorBrush x:Key="ChromeBorderBrush" Color="#3C444E" />
+        <SolidColorBrush x:Key="ChromeStrongBorderBrush" Color="#59626D" />
+        <SolidColorBrush x:Key="ChromeTabSeparatorBrush" Color="#69737E" />
+        <SolidColorBrush x:Key="ChromeTextBrush" Color="#C7CCD3" />
+        <SolidColorBrush x:Key="ChromeActiveTextBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="ChromeHoverBrush" Color="#2D333B" />
+        <SolidColorBrush x:Key="ChromePressedBrush" Color="#4A515B" />
+        <SolidColorBrush x:Key="ChromeMenuBrush" Color="#292E35" />
+        <SolidColorBrush x:Key="ChromeMenuHoverBrush" Color="#414852" />
+        <SolidColorBrush x:Key="ChromeWindowBorderBrush" Color="#111418" />
+        <SolidColorBrush x:Key="ChromeAccentBrush" Color="#5EA2E8" />
+
+        <Style x:Key="CaptionButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="46" />
+            <Setter Property="Height" Value="33" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource ChromeActiveTextBrush}" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource ChromeHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource ChromePressedBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CloseCaptionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource CaptionButtonStyle}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#C42B1C" />
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#A62418" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="NativeTabCloseButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource ChromeTextBrush}" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Arrow" />
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="CloseBackground"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="5">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CloseBackground"
+                                        Property="Background"
+                                        Value="{DynamicResource ChromePressedBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource ChromeActiveTextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="NativeStripButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ChromeBorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ChromeTabBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ChromeTextBrush}" />
+            <Setter Property="FontFamily" Value="Segoe UI Symbol" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Arrow" />
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="StripButtonSurface"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="StripButtonSurface" Property="Background" Value="{DynamicResource ChromeHoverBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource ChromeActiveTextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="StripButtonSurface" Property="Background" Value="{DynamicResource ChromePressedBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="NativeTabListMenuStyle" TargetType="ContextMenu">
+            <Setter Property="Background" Value="{DynamicResource ChromeMenuBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ChromeStrongBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource ChromeActiveTextBrush}" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="MinWidth" Value="220" />
+            <Setter Property="MaxHeight" Value="420" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ScrollViewer Background="{TemplateBinding Background}"
+                                          CanContentScroll="True"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <ItemsPresenter />
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="NativeTabListMenuItemStyle" TargetType="MenuItem">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="9,0" />
+            <Setter Property="Foreground" Value="{DynamicResource ChromeTextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="MenuItemSurface"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="5"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center"
+                                              ContentSource="Header" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="MenuItemSurface" Property="Background" Value="{DynamicResource ChromeMenuHoverBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource ChromeActiveTextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border BorderBrush="{DynamicResource ChromeWindowBorderBrush}"
+            BorderThickness="1"
+            Background="#FFFFFF">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="NativeChromeRow" Height="37" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid x:Name="NativeChrome"
+                  Grid.Row="0"
+                  Margin="0,3,0,0"
+                  Background="{DynamicResource ChromeBackgroundBrush}"
+                  PreviewMouseLeftButtonDown="OnChromeMouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="98" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="138" />
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0"
+                        Margin="5,4,3,0"
+                        Panel.ZIndex="10"
+                        VerticalAlignment="Top"
+                        Content="&#x25A6;"
+                        ToolTip="썸네일 패널 표시/숨김"
+                        Click="OnNativeThumbnailsClick"
+                        Style="{StaticResource NativeStripButtonStyle}" />
+
+                <ScrollViewer x:Name="NativeTabsScroll"
+                              Grid.Column="0"
+                              Grid.ColumnSpan="2"
+                              Margin="0,0,12,0"
+                              HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollBarVisibility="Disabled"
+                              PanningMode="HorizontalOnly"
+                              ClipToBounds="True"
+                              ScrollChanged="OnNativeTabsScrollChanged"
+                              PreviewMouseWheel="OnNativeTabsMouseWheel"
+                              WindowChrome.IsHitTestVisibleInChrome="True">
+                    <ItemsControl x:Name="NativeTabsList"
+                                  Margin="36,0,12,0"
+                                  AlternationCount="1000"
+                                  ItemsSource="{Binding NativeTabs, RelativeSource={RelativeSource AncestorType=Window}}"
+                                  AllowDrop="True"
+                                  DragOver="OnNativeTabStripDragOver"
+                                  Drop="OnNativeTabStripDrop">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Background="Transparent"
+                                      WindowChrome.IsHitTestVisibleInChrome="True"
+                                      PreviewMouseDown="OnNativeTabMiddleDown"
+                                      PreviewMouseUp="OnNativeTabMiddleUp">
+                                    <Border x:Name="TabSurface"
+                                            Width="220"
+                                            Height="30"
+                                            Margin="0,4,0,0"
+                                            Padding="12,0,5,0"
+                                            Background="Transparent"
+                                            BorderBrush="{DynamicResource ChromeBorderBrush}"
+                                            BorderThickness="0"
+                                            CornerRadius="0"
+                                            Cursor="Arrow"
+                                            ToolTip="{Binding TabToolTip}"
+                                            ToolTipService.InitialShowDelay="700"
+                                            ToolTipService.BetweenShowDelay="0"
+                                            ToolTipService.ShowDuration="60000"
+                                            Tag="{Binding Id}"
+                                            AllowDrop="True"
+                                            WindowChrome.IsHitTestVisibleInChrome="True"
+                                            PreviewMouseRightButtonUp="OnNativeTabContextMenu"
+                                            PreviewMouseLeftButtonDown="OnNativeTabMouseLeftButtonDown"
+                                            PreviewMouseMove="OnNativeTabMouseMove"
+                                            MouseLeftButtonUp="OnNativeTabMouseLeftButtonUp"
+                                            DragOver="OnNativeTabDragOver"
+                                            Drop="OnNativeTabDrop">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Ellipse x:Name="DirtyIndicator"
+                                                     Grid.Column="0"
+                                                     Width="6"
+                                                     Height="6"
+                                                     Margin="0,0,7,0"
+                                                     Fill="#E5534B"
+                                                     Visibility="Collapsed" />
+                                            <TextBlock x:Name="TabTitle"
+                                                       Grid.Column="1"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource ChromeTextBrush}"
+                                                       FontFamily="Segoe UI"
+                                                       FontSize="12.5"
+                                                       Text="{Binding Title}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <Button x:Name="TabCloseButton"
+                                                    Grid.Column="2"
+                                                    Margin="5,0,0,0"
+                                                    Content="×"
+                                                    Tag="{Binding Id}"
+                                                    ToolTip="탭 닫기"
+                                                    Click="OnNativeTabCloseClick"
+                                                    Style="{StaticResource NativeTabCloseButtonStyle}" />
+                                            <Border x:Name="SelectionIndicator"
+                                                    Grid.Column="0"
+                                                    Grid.ColumnSpan="3"
+                                                    Height="2"
+                                                    Margin="5,0"
+                                                    VerticalAlignment="Bottom"
+                                                    Background="{DynamicResource ChromeAccentBrush}"
+                                                    CornerRadius="1"
+                                                    Visibility="Collapsed" />
+                                        </Grid>
+                                    </Border>
+                                    <Border x:Name="TabSeparator"
+                                            Panel.ZIndex="2"
+                                            Width="1"
+                                            Height="20"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center"
+                                            Background="{DynamicResource ChromeTabSeparatorBrush}"
+                                            Opacity="0.9"
+                                            SnapsToDevicePixels="True"
+                                            IsHitTestVisible="False" />
+                                </Grid>
+                                <DataTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="TabSurface" Property="Background" Value="{DynamicResource ChromeHoverBrush}" />
+                                    </Trigger>
+                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex)}" Value="0">
+                                        <Setter TargetName="TabSeparator" Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter TargetName="TabSurface" Property="Background" Value="{DynamicResource ChromeSelectedTabBrush}" />
+                                        <Setter TargetName="SelectionIndicator" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                        <Setter TargetName="TabSurface" Property="Background" Value="{DynamicResource ChromeActiveTabBrush}" />
+                                        <Setter TargetName="TabSurface" Property="CornerRadius" Value="8,8,0,0" />
+                                        <Setter TargetName="TabTitle" Property="Foreground" Value="{DynamicResource ChromeActiveTextBrush}" />
+                                        <Setter TargetName="SelectionIndicator" Property="Visibility" Value="Collapsed" />
+                                        <Setter TargetName="TabSeparator" Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsDirty}" Value="True">
+                                        <Setter TargetName="DirtyIndicator" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding CanClose}" Value="False">
+                                        <Setter TargetName="TabCloseButton" Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <Border x:Name="NativeTabsLeftFade"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        Panel.ZIndex="5"
+                        Width="42"
+                        HorizontalAlignment="Left"
+                        Background="{DynamicResource ChromeBackgroundBrush}"
+                        IsHitTestVisible="False"
+                        Visibility="Collapsed">
+                    <Border.OpacityMask>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Offset="0" Color="#FF000000" />
+                            <GradientStop Offset="1" Color="#00000000" />
+                        </LinearGradientBrush>
+                    </Border.OpacityMask>
+                </Border>
+                <Border x:Name="NativeTabsRightFade"
+                        Grid.Column="1"
+                        Panel.ZIndex="5"
+                        Width="12"
+                        HorizontalAlignment="Right"
+                        Background="{DynamicResource ChromeBackgroundBrush}"
+                        IsHitTestVisible="False"
+                        Visibility="Collapsed">
+                    <Border.OpacityMask>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Offset="0" Color="#00000000" />
+                            <GradientStop Offset="1" Color="#FF000000" />
+                        </LinearGradientBrush>
+                    </Border.OpacityMask>
+                </Border>
+
+                <Border x:Name="NativeChromeDragSpacer"
+                        Grid.Column="2"
+                        Width="98"
+                        Background="Transparent" />
+
+                <Button Grid.Column="3"
+                        x:Name="NativeTabListButton"
+                        Margin="3,4,4,0"
+                        VerticalAlignment="Top"
+                        Content="&#x2637;"
+                        ToolTip="열린 탭 목록"
+                        Click="OnNativeTabListClick"
+                        Style="{StaticResource NativeStripButtonStyle}" />
+
+                <StackPanel Grid.Column="4"
+                            HorizontalAlignment="Right"
+                            Orientation="Horizontal">
+                    <Button Content="&#xE921;"
+                            ToolTip="최소화"
+                            Click="OnMinimizeClick"
+                            Style="{StaticResource CaptionButtonStyle}" />
+                    <Button x:Name="MaximizeButton"
+                            Content="&#xE922;"
+                            ToolTip="최대화"
+                            Click="OnMaximizeRestoreClick"
+                            Style="{StaticResource CaptionButtonStyle}" />
+                    <Button Content="&#xE8BB;"
+                            ToolTip="닫기"
+                            Click="OnCloseClick"
+                            Style="{StaticResource CloseCaptionButtonStyle}" />
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="1"
+                  x:Name="ContentHost">
+                <Border x:Name="WebViewBoundsElement"
+                        Background="#FFFFFF" />
+
+                <Border x:Name="LoadingOverlay"
+                        Panel.ZIndex="20"
+                        Background="#0C0D0F">
+                    <StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <Viewbox Width="310"
+                                 MaxWidth="310"
+                                 Stretch="Uniform">
+                            <Path Fill="#FFFFFF"
+                                  Stretch="Uniform"
+                                  Data="M134 1448V0H634Q849 0 1005.0 86.5Q1161 173 1244.5 336.0Q1328 499 1328 722Q1328 947 1244.0 1110.5Q1160 1274 1002.0 1361.0Q844 1448 626 1448ZM612 1222Q839 1222 953.5 1097.0Q1068 972 1068 722Q1068 474 955.0 350.0Q842 226 620 226H394V1222ZM1941 814Q2114 802 2219 798V712Q2219 631 2168.0 586.5Q2117 542 2023 542Q1940 542 1887.0 577.0Q1834 612 1819 672H1573Q1582 579 1639.0 505.5Q1696 432 1796.0 390.0Q1896 348 2029 348Q2143 348 2243.5 383.5Q2344 419 2408.5 502.5Q2473 586 2473 722V1448H2229V1298H2221Q2181 1374 2101.0 1422.0Q2021 1470 1901 1470Q1796 1470 1713.5 1432.0Q1631 1394 1584.0 1320.0Q1537 1246 1537 1142Q1537 974 1650.5 899.5Q1764 825 1941 814ZM1967 1282Q2042 1282 2100.0 1252.0Q2158 1222 2189.5 1170.5Q2221 1119 2221 1058L2220 969L1981 984Q1887 992 1835.0 1031.0Q1783 1070 1783 1140Q1783 1209 1833.0 1245.5Q1883 1282 1967 1282ZM2736 1850V1646Q2800 1650 2844 1650Q2882 1650 2907.5 1643.0Q2933 1636 2957.0 1609.5Q2981 1583 3002 1528L3024 1470L2628 362H2898L3150 1182H3162L3414 362H3684L3248 1580Q3200 1716 3108.0 1786.0Q3016 1856 2868 1856Q2784 1856 2736 1850ZM3804 906Q3804 730 3863.0 604.0Q3922 478 4024.0 413.0Q4126 348 4254 348Q4470 348 4564 540H4574V0H4828V1448H4578V1276H4564Q4468 1468 4252 1468Q4123 1468 4021.5 1401.5Q3920 1335 3862.0 1208.0Q3804 1081 3804 906ZM4580 904Q4580 799 4550.0 720.5Q4520 642 4462.0 599.0Q4404 556 4322 556Q4239 556 4181.0 600.0Q4123 644 4093.5 723.0Q4064 802 4064 904Q4064 1008 4094.0 1088.0Q4124 1168 4182.0 1213.0Q4240 1258 4322 1258Q4403 1258 4461.0 1214.0Q4519 1170 4549.5 1090.0Q4580 1010 4580 904ZM5481 814Q5654 802 5759 798V712Q5759 631 5708.0 586.5Q5657 542 5563 542Q5480 542 5427.0 577.0Q5374 612 5359 672H5113Q5122 579 5179.0 505.5Q5236 432 5336.0 390.0Q5436 348 5569 348Q5683 348 5783.5 383.5Q5884 419 5948.5 502.5Q6013 586 6013 722V1448H5769V1298H5761Q5721 1374 5641.0 1422.0Q5561 1470 5441 1470Q5336 1470 5253.5 1432.0Q5171 1394 5124.0 1320.0Q5077 1246 5077 1142Q5077 974 5190.5 899.5Q5304 825 5481 814ZM5507 1282Q5582 1282 5640.0 1252.0Q5698 1222 5729.5 1170.5Q5761 1119 5761 1058L5760 969L5521 984Q5427 992 5375.0 1031.0Q5323 1070 5323 1140Q5323 1209 5373.0 1245.5Q5423 1282 5507 1282ZM6276 1850V1646Q6340 1650 6384 1650Q6422 1650 6447.5 1643.0Q6473 1636 6497.0 1609.5Q6521 1583 6542 1528L6564 1470L6168 362H6438L6690 1182H6702L6954 362H7224L6788 1580Q6740 1716 6648.0 1786.0Q6556 1856 6408 1856Q6324 1856 6276 1850ZM7437 0H7981Q8143 0 8258.0 61.0Q8373 122 8432.0 230.5Q8491 339 8491 480Q8491 620 8431.5 728.5Q8372 837 8256.0 897.5Q8140 958 7977 958H7697V1448H7437ZM7941 744Q8083 744 8154.0 672.5Q8225 601 8225 480Q8225 358 8154.0 288.0Q8083 218 7941 218H7697V744ZM8742 1448V0H9242Q9457 0 9613.0 86.5Q9769 173 9852.5 336.0Q9936 499 9936 722Q9936 947 9852.0 1110.5Q9768 1274 9610.0 1361.0Q9452 1448 9234 1448ZM9220 1222Q9447 1222 9561.5 1097.0Q9676 972 9676 722Q9676 474 9563.0 350.0Q9450 226 9228 226H9002V1222ZM10207 0H11135V218H10467V614H11071V832H10467V1448H10207Z" />
+                        </Viewbox>
+                        <ProgressBar x:Name="ContentLoadingProgress"
+                                     Width="168"
+                                     Height="3"
+                                     Margin="0,27,0,0"
+                                     Background="#30343A"
+                                     Foreground="#F3F5F7"
+                                     BorderThickness="0"
+                                     IsIndeterminate="True"
+                                     Visibility="Collapsed" />
+                        <TextBlock x:Name="LoadingStatusText"
+                                   Margin="0,22,0,0"
+                                   HorizontalAlignment="Center"
+                                   Foreground="#AEB4BD"
+                                   FontSize="12.5"
+                                   Text="" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border x:Name="StartupLoadingOverlay"
+                    Grid.RowSpan="2"
+                    Panel.ZIndex="100"
+                    Background="#0C0D0F">
+                <Viewbox Width="310"
+                         MaxWidth="310"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         Stretch="Uniform">
+                    <Path Fill="#FFFFFF"
+                          Stretch="Uniform"
+                          Data="M134 1448V0H634Q849 0 1005.0 86.5Q1161 173 1244.5 336.0Q1328 499 1328 722Q1328 947 1244.0 1110.5Q1160 1274 1002.0 1361.0Q844 1448 626 1448ZM612 1222Q839 1222 953.5 1097.0Q1068 972 1068 722Q1068 474 955.0 350.0Q842 226 620 226H394V1222ZM1941 814Q2114 802 2219 798V712Q2219 631 2168.0 586.5Q2117 542 2023 542Q1940 542 1887.0 577.0Q1834 612 1819 672H1573Q1582 579 1639.0 505.5Q1696 432 1796.0 390.0Q1896 348 2029 348Q2143 348 2243.5 383.5Q2344 419 2408.5 502.5Q2473 586 2473 722V1448H2229V1298H2221Q2181 1374 2101.0 1422.0Q2021 1470 1901 1470Q1796 1470 1713.5 1432.0Q1631 1394 1584.0 1320.0Q1537 1246 1537 1142Q1537 974 1650.5 899.5Q1764 825 1941 814ZM1967 1282Q2042 1282 2100.0 1252.0Q2158 1222 2189.5 1170.5Q2221 1119 2221 1058L2220 969L1981 984Q1887 992 1835.0 1031.0Q1783 1070 1783 1140Q1783 1209 1833.0 1245.5Q1883 1282 1967 1282ZM2736 1850V1646Q2800 1650 2844 1650Q2882 1650 2907.5 1643.0Q2933 1636 2957.0 1609.5Q2981 1583 3002 1528L3024 1470L2628 362H2898L3150 1182H3162L3414 362H3684L3248 1580Q3200 1716 3108.0 1786.0Q3016 1856 2868 1856Q2784 1856 2736 1850ZM3804 906Q3804 730 3863.0 604.0Q3922 478 4024.0 413.0Q4126 348 4254 348Q4470 348 4564 540H4574V0H4828V1448H4578V1276H4564Q4468 1468 4252 1468Q4123 1468 4021.5 1401.5Q3920 1335 3862.0 1208.0Q3804 1081 3804 906ZM4580 904Q4580 799 4550.0 720.5Q4520 642 4462.0 599.0Q4404 556 4322 556Q4239 556 4181.0 600.0Q4123 644 4093.5 723.0Q4064 802 4064 904Q4064 1008 4094.0 1088.0Q4124 1168 4182.0 1213.0Q4240 1258 4322 1258Q4403 1258 4461.0 1214.0Q4519 1170 4549.5 1090.0Q4580 1010 4580 904ZM5481 814Q5654 802 5759 798V712Q5759 631 5708.0 586.5Q5657 542 5563 542Q5480 542 5427.0 577.0Q5374 612 5359 672H5113Q5122 579 5179.0 505.5Q5236 432 5336.0 390.0Q5436 348 5569 348Q5683 348 5783.5 383.5Q5884 419 5948.5 502.5Q6013 586 6013 722V1448H5769V1298H5761Q5721 1374 5641.0 1422.0Q5561 1470 5441 1470Q5336 1470 5253.5 1432.0Q5171 1394 5124.0 1320.0Q5077 1246 5077 1142Q5077 974 5190.5 899.5Q5304 825 5481 814ZM5507 1282Q5582 1282 5640.0 1252.0Q5698 1222 5729.5 1170.5Q5761 1119 5761 1058L5760 969L5521 984Q5427 992 5375.0 1031.0Q5323 1070 5323 1140Q5323 1209 5373.0 1245.5Q5423 1282 5507 1282ZM6276 1850V1646Q6340 1650 6384 1650Q6422 1650 6447.5 1643.0Q6473 1636 6497.0 1609.5Q6521 1583 6542 1528L6564 1470L6168 362H6438L6690 1182H6702L6954 362H7224L6788 1580Q6740 1716 6648.0 1786.0Q6556 1856 6408 1856Q6324 1856 6276 1850ZM7437 0H7981Q8143 0 8258.0 61.0Q8373 122 8432.0 230.5Q8491 339 8491 480Q8491 620 8431.5 728.5Q8372 837 8256.0 897.5Q8140 958 7977 958H7697V1448H7437ZM7941 744Q8083 744 8154.0 672.5Q8225 601 8225 480Q8225 358 8154.0 288.0Q8083 218 7941 218H7697V744ZM8742 1448V0H9242Q9457 0 9613.0 86.5Q9769 173 9852.5 336.0Q9936 499 9936 722Q9936 947 9852.0 1110.5Q9768 1274 9610.0 1361.0Q9452 1448 9234 1448ZM9220 1222Q9447 1222 9561.5 1097.0Q9676 972 9676 722Q9676 474 9563.0 350.0Q9450 226 9228 226H9002V1222ZM10207 0H11135V218H10467V614H11071V832H10467V1448H10207Z" />
+                </Viewbox>
+            </Border>
+            <ProgressBar x:Name="StartupLoadingProgress"
+                         Grid.RowSpan="2"
+                         Panel.ZIndex="101"
+                         Width="168"
+                         Height="3"
+                         Margin="0,98,0,0"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         Background="#30343A"
+                         Foreground="#F3F5F7"
+                         BorderThickness="0"
+                         IsIndeterminate="True"
+                         Visibility="Collapsed" />
+            <Button x:Name="StartupLoadingCloseButton"
+                    Grid.RowSpan="2"
+                    Panel.ZIndex="102"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Content="&#xE8BB;"
+                    ToolTip="닫기"
+                    Click="OnCloseClick"
+                    Style="{StaticResource CloseCaptionButtonStyle}"
+                    Visibility="Collapsed" />
+            <Border x:Name="TopResizeGrip"
+                    Grid.RowSpan="2"
+                    Panel.ZIndex="1000"
+                    Height="3"
+                    Margin="20,0,20,0"
+                    VerticalAlignment="Top"
+                    Background="{DynamicResource ChromeBackgroundBrush}"
+                    Cursor="SizeNS"
+                    WindowChrome.IsHitTestVisibleInChrome="True"
+                    PreviewMouseLeftButtonDown="OnTopResizeGripMouseDown" />
+            <Border x:Name="TopLeftResizeGrip"
+                    Grid.RowSpan="2"
+                    Panel.ZIndex="1000"
+                    Width="20"
+                    Height="3"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Background="{DynamicResource ChromeBackgroundBrush}"
+                    Cursor="SizeNWSE"
+                    WindowChrome.IsHitTestVisibleInChrome="True"
+                    PreviewMouseLeftButtonDown="OnTopLeftResizeGripMouseDown" />
+            <Border x:Name="TopRightResizeGrip"
+                    Grid.RowSpan="2"
+                    Panel.ZIndex="1000"
+                    Width="20"
+                    Height="3"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Background="{DynamicResource ChromeBackgroundBrush}"
+                    Cursor="SizeNESW"
+                    WindowChrome.IsHitTestVisibleInChrome="True"
+                    PreviewMouseLeftButtonDown="OnTopRightResizeGripMouseDown" />
+        </Grid>
+    </Border>
+</Window>

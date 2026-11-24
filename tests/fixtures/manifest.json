@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "generatorSeed": 20260821,
+  "usageProfile": {
+    "documentType": "color-scanned-pdf",
+    "pageRange": [
+      15,
+      130
+    ],
+    "representativePageCounts": [
+      15,
+      50,
+      130
+    ],
+    "deviceClass": "general-desktop-or-laptop"
+  },
+  "files": [
+    {
+      "file": "scan-color-15p.pdf",
+      "pages": 15,
+      "bytes": 1577373,
+      "sha256": "448C06DE7C9DBCB78EF5D96BD9ED2BE60E9838F195295357D0E86A68FAE4FEA2",
+      "encrypted": false
+    },
+    {
+      "file": "scan-color-50p.pdf",
+      "pages": 50,
+      "bytes": 5291944,
+      "sha256": "88FD582D66325D0EEA205023FDFEE786962C01709C0C139EDA867204B62F2DA6",
+      "encrypted": false
+    },
+    {
+      "file": "scan-color-130p.pdf",
+      "pages": 130,
+      "bytes": 13673318,
+      "sha256": "A0CE616DA0A4D6060DC1A0D686A0B6E84D43E7A5215B11D29900A744F34C59E1",
+      "encrypted": false
+    },
+    {
+      "file": "text-vector-links.pdf",
+      "pages": 6,
+      "bytes": 8451,
+      "sha256": "E91E9F412F851EFBFDC817A87EB79EABA7C9F18EB9CA86E68B4F94A8B4467732",
+      "encrypted": false
+    },
+    {
+      "file": "mixed-page-sizes-rotations.pdf",
+      "pages": 8,
+      "bytes": 5109,
+      "sha256": "66BE3D33DEADEDA19F9CB9C8DD3F2D0B584DCAB6FE2FEC3C6DE5D99D72CA2A75",
+      "encrypted": false
+    },
+    {
+      "file": "annotations-form.pdf",
+      "pages": 2,
+      "bytes": 9292,
+      "sha256": "2A4D428F00E481EE0ABA0CBBA27449FBE0B37ED16691CCD0A769040E2F11EC1E",
+      "encrypted": false
+    },
+    {
+      "file": "encrypted-user-password.pdf",
+      "pages": 6,
+      "bytes": 10062,
+      "sha256": "28749D5670E56BB1F5AE34998F0A02DFF44EB4F6312E1B16FA808803D37D49F3",
+      "encrypted": true
+    },
+    {
+      "file": "restricted-owner-permissions.pdf",
+      "pages": 6,
+      "bytes": 10063,
+      "sha256": "A742A8716782F12BE94390E6ECA73D799DD207D96FBE4E0C924750F7D24FF563",
+      "encrypted": true
+    }
+  ]
+}

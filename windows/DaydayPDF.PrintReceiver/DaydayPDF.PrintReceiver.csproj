@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>DaydayPDF.PrintReceiver</AssemblyName>
+    <Version>$(PreviewPackageVersion)</Version>
+    <InformationalVersion>$(PreviewChannel) $(PreviewDisplayVersion)</InformationalVersion>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+  <ItemGroup><Compile Include="../Shared/PrintInbox.cs" Link="PrintInbox.cs" /></ItemGroup>
+</Project>

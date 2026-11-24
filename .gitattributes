@@ -1,0 +1,16 @@
+.gitattributes text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.mjs text eol=lf
+*.py text eol=lf
+
+*.ico binary
+*.pdf binary
+*.png binary
+*.woff2 binary
+/LICENSE text eol=lf
+/assets/windows-vendor/licenses/*.txt text eol=lf
+/assets/windows-vendor/pdfium/2.15.0/LICENSE* -text

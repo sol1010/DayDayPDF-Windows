@@ -1,0 +1,19 @@
+name: Windows build
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: windows/global.json
+      - run: ./windows/build-release.ps1
+      - run: npm test
+      - run: dotnet run --project windows/PdfEditor.Output.Tests -c Release -- --update-feed
+      - run: dotnet run --project windows/PdfEditor.Output.Tests -c Release -- --window-sizing

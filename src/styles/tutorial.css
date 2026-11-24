@@ -1,0 +1,40 @@
+.setTutorial {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:12px 14px; margin-bottom:20px; border:1px solid var(--border); border-radius:8px;
+}
+.setTutorial strong { display:block; font-size:13px; margin-bottom:4px; }
+.setTutorial p { color:var(--dim); font-size:12px; line-height:1.5; }
+.setTutorial .btn { flex-shrink:0; min-height:40px; }
+#editorTutorial { position:fixed; inset:0; z-index:10050; overflow:hidden; isolation:isolate; }
+#editorTutorial.tutorialCentered { background:rgba(0,0,0,.58); }
+.tutorialSpotlight {
+  position:fixed; border:2px solid var(--accent); border-radius:7px;
+  box-shadow:0 0 0 200vmax rgba(0,0,0,.58); pointer-events:none;
+}
+.tutorialSpotlight[hidden] { display:none; }
+.tutorialTarget { opacity:1 !important; }
+.tutorialCard {
+  position:fixed; display:flex; flex-direction:column; gap:14px; padding:16px;
+  color:var(--text); background:var(--panel); border:1px solid var(--border);
+  border-radius:10px; box-shadow:0 10px 36px #0005; font-size:13px; outline:none;
+}
+.tutorialTop, .tutorialActions { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-shrink:0; }
+.tutorialProgress { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.tutorialCopy { overflow-y:auto; min-height:0; }
+.tutorialCard h2 { font-size:17px; line-height:1.4; margin:0 0 8px; }
+.tutorialCard p { line-height:1.65; margin:0; overflow-wrap:anywhere; }
+.tutorialCard button {
+  flex-shrink:0; min-height:40px; padding:8px 14px; border:1px solid var(--border);
+  border-radius:6px; background:var(--panel2); color:var(--text); font:inherit; cursor:pointer;
+}
+.tutorialCard .tutorialClose { min-height:36px; padding:6px 8px; background:transparent; border-color:transparent; }
+.tutorialCard .tutorialNext { background:var(--accent2); border-color:var(--accent2); color:#fff; min-width:80px; }
+.tutorialCard button:hover { filter:brightness(1.1); }
+.tutorialCard button:disabled { opacity:.4; cursor:default; }
+.tutorialCard button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media (max-width:480px) {
+  .setTutorial { align-items:flex-start; gap:10px; }
+  .setTutorial p { max-width:25ch; }
+  .tutorialCard { gap:12px; padding:14px; }
+  .tutorialCard button { min-height:44px; }
+}

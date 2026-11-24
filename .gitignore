@@ -1,0 +1,34 @@
+# 구형 바로가기 (bat으로 대체됨)
+*.lnk
+
+# OS 잡파일
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# 배포 산출물 (추후 minify 결과)
+dist/
+node_modules/
+
+# PC Preview 로컬 생성물 — 실행파일은 GitHub Release 자산으로만 배포
+.pc-code-sync/
+windows/Package/RunPreview*/
+windows/Package/SinglePreview*/
+windows/Package/Setup-*/
+windows/Package/PrintReceiver-*/
+windows/PdfEditor.Preview/WebApp/
+
+# 로컬 테스트 임시 산출물
+tmp/
+__pycache__/
+*.pyc
+
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+credentials.json
+*.pdf
+!tests/fixtures/*.pdf

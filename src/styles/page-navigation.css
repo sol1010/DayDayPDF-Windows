@@ -1,0 +1,38 @@
+ 
+.pageNavigator {
+  --page-nav-size: 44px; --page-nav-number-width: 48px; --page-nav-font-size: 14px;
+  display: flex; align-items: center; flex: none; padding: 0;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--panel); overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+#pageNavigator { --page-nav-size: 30px; --page-nav-number-width: 40px; --page-nav-font-size: 12px; border-radius: 6px; }
+#prPreviewNav { align-self: center; margin: 8px 16px 12px; }
+:is(#pageNavigator, #prPreviewNav) .pageNavButton {
+  display: grid; place-items: center; flex: none;
+  width: var(--page-nav-size); min-width: var(--page-nav-size); height: var(--page-nav-size); min-height: var(--page-nav-size);
+  margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--text);
+}
+.pageNavButton svg { display: block; width: 18px; height: 18px; }
+:is(#pageNavigator, #prPreviewNav) .pageNavButton:not(:disabled):hover { background: var(--panel2); }
+:is(#pageNavigator, #prPreviewNav) .pageNavButton:disabled { opacity: .35; }
+:is(#pageNavigator, #prPreviewNav) .pageNavButton:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+.pageNavCounter {
+  display: grid; grid-template-columns: var(--page-nav-number-width) 14px var(--page-nav-number-width); place-items: center;
+  height: var(--page-nav-size); padding: 0 6px; border-inline: 1px solid var(--border);
+  font-size: var(--page-nav-font-size); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums;
+}
+:is(#pageNavigator, #prPreviewNav) input.pageNavInput {
+  flex: none; width: var(--page-nav-number-width); height: var(--page-nav-size);
+  margin: 0; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--text);
+  font: inherit; font-variant-numeric: tabular-nums; text-align: center; appearance: textfield;
+}
+:is(#pageNavigator, #prPreviewNav) input.pageNavInput:hover,
+:is(#pageNavigator, #prPreviewNav) input.pageNavInput:focus-visible { background: var(--panel2); }
+:is(#pageNavigator, #prPreviewNav) input.pageNavInput:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+.pageNavInput::-webkit-inner-spin-button, .pageNavInput::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.pageNavCounter > span { display: grid; place-items: center; height: var(--page-nav-size); color: var(--dim); }
+.pageNavTotal { width: var(--page-nav-number-width); }
+@media (max-width: 768px) {
+  .pageNavigator { --page-nav-font-size: 16px; }
+  #pageNavigator { --page-nav-size: 38px; --page-nav-font-size: 16px; }
+}

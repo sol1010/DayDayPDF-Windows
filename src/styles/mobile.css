@@ -1,0 +1,219 @@
+  #viewer { touch-action: pan-x pan-y; }    
+  body.shapeMode #viewer { touch-action: none; }
+  body.regionMode #viewer { touch-action: none; }
+  #sidebar { touch-action: pan-y; }
+  body { -webkit-tap-highlight-color: transparent; }
+  @media (max-width: 768px) {
+    body { height: 100dvh; }  
+     
+    #btnPrint,
+    #ctxMenu .mi[data-cmd="printSel"] { display: none !important; }
+    #toolbar .btn .lbl { display: none; }               
+    #toolbar { gap: 1px; padding: 3px 4px; }
+    #toolbar .btn { width: 30px; min-width: 30px; height: 30px; padding: 0; font-size: 14px; }
+    #toolbar .btn.icon { padding: 0; }
+    #toolbar #btnHome { width: auto; min-width: 0; padding: 0 4px; }
+    #btnHome .daydaypdfLogo { height: 12.5px; }
+    #toolbar .sep { height: 18px; margin: 0 2px; }
+    #textBar {
+      max-width: calc(100vw - 12px); padding: 4px 5px; border-radius: 7px;
+      overflow-x: auto; overflow-y: hidden; scrollbar-width: none; touch-action: none;
+    }
+    #textBar.mobileToolbarDragging, #shapeTextBar.mobileToolbarDragging {
+      cursor: grabbing; user-select: none; -webkit-user-select: none;
+    }
+    #textBar::-webkit-scrollbar { display: none; }
+    #textBar .tbRow { gap: 4px; flex-shrink: 0; }
+    #textBar select { height: 25px; padding: 0 3px; font-size: 12px; }
+    #textBar .fontPickerButton { width: 104px; height: 25px; padding: 0 5px; font-size: 11.5px; }
+    #textBar .tbArrowSelect { width: 72px; }
+    #textBar .tbArrowEndSelect { width: 92px; }
+    #textBar #tbSize { width: 42px !important; height: 25px !important; }
+    #textBar #tbSw { width: 46px; height: 25px; }
+    #textBar .tbGrp { height: 25px; gap: 3px; padding: 0 4px; }
+    #textBar .tbGrp input[type=range], #shapeTextBar .tbGrp input[type=range] {
+      width: 76px; height: 23px; margin: 0; zoom: 1; touch-action: none;
+    }
+    #textBar .tbtn { width: 27px; height: 25px; }
+    #textBar .tbPin { width: 30px; height: 30px; min-width: 30px; border-radius: 6px; margin: 0; }
+    #textBar .tbActions { gap: 6px; margin-left: 6px; padding-left: 6px; }
+    #textBar .tbActions .mobileToolbarDelete { width: 30px; min-width: 30px; height: 30px; }
+    #tbPinIcon, #stPinIcon { font-size: 13px; }
+    #textBar :is(button,select,input,.tbGrp,.tbArrowCtl,.tbArrowHeadLabel),
+    #shapeTextBar :is(button,select,input,.tbGrp) { flex-shrink: 0; }
+    #textBar .mobileToolbarDelete {
+      display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center;
+      color: #e25555;
+    }
+    #shapeTextBar {
+      max-width: calc(100vw - 12px); padding: 6px 7px; gap: 4px; overflow-x: auto;
+      touch-action: none;
+    }
+    #shapeTextBar .shapeTextBarLabel { display: none; }
+    #shapeTextBar .tbRow { gap: 4px; }
+    #shapeTextBar select { height: 25px; padding: 0 3px; font-size: 12px; }
+    #shapeTextBar .fontPickerButton { width: 104px; height: 25px; padding: 0 5px; font-size: 11.5px; }
+    #shapeTextBar #stSize { width: 42px; height: 25px; }
+    #shapeTextBar .tbGrp { height: 25px; gap: 3px; padding: 0 4px; }
+    #shapeTextBar .tbGrp input[type=range] { width: 76px; }
+    #shapeTextBar .tbtn { width: 27px; height: 25px; }
+    #shapeTextBar .tbPin { width: 30px; min-width: 30px; height: 30px; border-radius: 6px; margin-left: 6px; }
+    .fontPicker.mobile {
+      width: auto; max-width: none; height: min(68vh, 520px); border-radius: 14px;
+      box-shadow: 0 -10px 36px rgba(0,0,0,.5);
+    }
+    .fontPicker.mobile .fontPickerHead input { font-size: 16px; }
+    .fontPicker.mobile .fontPickerItem { min-height: 48px; }
+    .fontPicker.mobile .fontPickerName, .fontPicker.mobile .fontPickerSample { font-size: 14px; }
+    #shapeMenu {
+      left: 0 !important; right: 0 !important; bottom: auto;
+      width: auto; min-width: 0; grid-auto-flow: column; grid-auto-columns: max-content;
+      gap: 2px; padding: 4px 6px; border-radius: 0 0 8px 8px; border-top: 0;
+      overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+      overscroll-behavior-x: contain; touch-action: pan-x;
+    }
+    #shapeMenu::-webkit-scrollbar { display: none; }
+    #shapeMenu .mi {
+      min-width: 44px; min-height: 44px; box-sizing: border-box; padding: 7px 10px;
+      align-items: center; justify-content: center; text-align: center; white-space: nowrap;
+    }
+    button[title] { -webkit-touch-callout: none; }
+    .textMark[contenteditable="true"] {
+      min-width: 28px; min-height: 1.3em; cursor: text; caret-color: currentColor;
+      user-select: text; -webkit-user-select: text; touch-action: manipulation;
+    }
+    .objHandle { touch-action: none; background: #fff; border: 2px solid var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+    .objHandle.dir-nw, .objHandle.dir-ne, .objHandle.dir-se, .objHandle.dir-sw {
+      width: 18px; height: 18px; border-radius: 50%;
+    }
+    .objHandle.dir-nw { left: -20px; top: -20px; }
+    .objHandle.dir-ne { right: -20px; top: -20px; }
+    .objHandle.dir-se { right: -20px; bottom: -20px; }
+    .objHandle.dir-sw { left: -20px; bottom: -20px; }
+    .objHandle.dir-n, .objHandle.dir-s {
+      width: 28px; height: 12px; left: 50%; margin-left: -14px; border-radius: 7px;
+    }
+    .objHandle.dir-n { top: -14px; }
+    .objHandle.dir-s { bottom: -14px; }
+    .objHandle.dir-e, .objHandle.dir-w {
+      width: 12px; height: 28px; top: 50%; margin-top: -14px; border-radius: 7px;
+    }
+    .objHandle.dir-e { right: -14px; }
+    .objHandle.dir-w { left: -14px; }
+    .objHandle[class*="dir-"]::after,
+    .objHandle.p1::after, .objHandle.p2::after {
+      content: ''; position: absolute; inset: -8px;
+    }
+    .objHandle.p1, .objHandle.p2 {
+      width: 18px; height: 18px; margin: -9px 0 0 -9px;
+      background: #fff; border: 2px solid var(--accent);
+    }
+    .objHandle.polyVertex, .objHandle.polySegment {
+      width: 18px; height: 18px; margin: -9px 0 0 -9px;
+    }
+    .objHandle.arrowHeadResize {
+      width: 12px; height: 12px; margin: -6px 0 0 -6px; box-sizing: border-box;
+      background: var(--panel); border: 1px solid var(--accent); opacity: 1;
+    }
+    .objHandle.arrowHeadResize::after { content: ''; position: absolute; inset: -8px; }
+    .objHandle.mobile-active:not(.rotate) {
+      transform: scale(1.28); opacity: 1;
+      box-shadow: 0 1px 5px rgba(0,0,0,.42), 0 0 0 1px rgba(76,141,255,.28);
+    }
+    .objHandle.connectorBody {
+      width: 18px; height: 18px; margin: -9px 0 0 -9px; border-width: 2px;
+    }
+    .objHandle.rotate { top: -66px; width: 36px; height: 36px; margin-left: -18px; box-shadow: none; }
+    .objHandle.rotate::before { left: 10px; width: 16px; height: 16px; }
+    .objHandle.rotate::after { left: 17px; top: 15px; height: 51px; }
+    .objHandle.rotate.lineRotate { width: 20px; height: 20px; margin: 0; }
+    .objHandle.rotate.lineRotate::before { left: 2px; top: 2px; width: 16px; height: 16px; }
+    .objHandle.rotate.lineRotate::after { left: 9px; top: 10px; height: var(--rotate-stem-length, 21px); }
+    .pageWrap .obj.sel { touch-action: none; }
+    #tabbar { gap: 0; padding: 3px 0 0; }
+    #btnThumbs, #btnTabList {
+      height: 34px; font-size: 16px; background: transparent;
+      border: 0; border-radius: 0; margin: 0;
+    }
+    #btnThumbs { width: 42px; border-right: 1px solid var(--border); }
+    #btnTabList { width: 48px; border-left: 1px solid var(--border); }
+    #btnThumbs:hover, #btnThumbs:active, #btnThumbs:focus-visible { background: transparent; }
+    #btnTabList:hover { background: var(--panel2); }
+    #tabStrip { padding: 0 4px; }
+     
+    #statusbar { padding: 5px 8px; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+    #statusbar::-webkit-scrollbar { display: none; }
+    #stFile, #stSel { display: none; }
+    #statusbar .sbtn { min-height: 38px; min-width: 38px; font-size: 13.5px; flex-shrink: 0; }
+     
+    #main { position: relative; }
+    #sidebar {
+      position: absolute; left: 0; top: 0; bottom: 0; z-index: 30;
+      width: min(var(--panelw, 236px), 84vw, 360px); box-shadow: 4px 0 24px rgba(0,0,0,.45);
+    }
+    #sidebar .thumb { max-width: 100%; min-width: 0; }
+    #sideGrip {
+      display: block; position: absolute; top: 0; bottom: 0;
+      left: min(var(--panelw, 236px), 84vw, 360px); width: 28px;
+      transform: translateX(-50%); z-index: 31; background: transparent;
+    }
+    #sideGrip:hover, #sideGrip.dragging { background: transparent; }
+    #sideGrip::before {
+      content: ''; position: absolute; left: 50%; top: 0; bottom: 0;
+      width: 1px; background: var(--border); pointer-events: none;
+    }
+    #sideGrip::after {
+      content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 5px; height: 64px; border-radius: 4px; background: var(--dim);
+      box-shadow: 0 0 0 3px var(--panel); pointer-events: none;
+    }
+    #sideGrip.dragging::after, #sideGrip:focus-visible::after { background: var(--accent); }
+     
+    .overlay {
+      align-items: flex-start; overflow-y: auto; padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
+    }
+    .dialog {
+      max-width: 94vw; max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      overflow-y: auto; flex-shrink: 0; margin: auto 0;
+    }
+    #crOverlay .dialog {
+      width: 100% !important; min-width: 0 !important;
+      height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+      resize: none !important;
+    }
+    #crOverlay #crScroll { padding: 8px !important; }
+    #crRect .crH { width: 20px; height: 20px; border-radius: 50%; }
+    #crRect .crH.nw { left: -11px; top: -11px; }
+    #crRect .crH.ne { right: -11px; top: -11px; }
+    #crRect .crH.se { right: -11px; bottom: -11px; }
+    #crRect .crH.sw { left: -11px; bottom: -11px; }
+    .regionBox { touch-action: none; }
+    .regionBox .rh { width: 22px; height: 22px; }
+    .regionBox .rh.nw { left: -12px; top: -12px; }
+    .regionBox .rh.ne { right: -12px; top: -12px; }
+    .regionBox .rh.se { right: -12px; bottom: -12px; }
+    .regionBox .rh.sw { left: -12px; bottom: -12px; }
+    #regionBar { max-width: calc(100vw - 12px); padding: 6px; gap: 5px; }
+    #regionBar .regionBarLabel { display: none; }
+    #regionBar button { min-height: 40px; padding: 0 13px; font-size: 13px; }
+    #regionBar .regionCancel { width: 40px; min-width: 40px; padding: 0; }
+    #setOverlay .setDialog {
+      width: 100% !important; height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      max-width: 100%; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); overflow: hidden;
+    }
+    #setOverlay .setSide {
+      padding: 8px; flex-direction: row; align-items: center; border-right: 0; border-bottom: 1px solid var(--border);
+      min-width: 0; overflow-x: auto;
+    }
+    #setOverlay .setBrand { margin-right: auto; padding: 0 8px; flex-shrink: 0; white-space: nowrap; }
+    #setOverlay .setNavBtn { padding: 8px 10px; white-space: nowrap; }
+    #setOverlay .setNavBtn[data-set-pane="shortcuts"],
+    #setOverlay .setPane[data-set-pane="shortcuts"],
+    #setOverlay #setReset { display: none !important; }
+    #setOverlay .setNavBtn.mobileSetOnly { display: block; }
+    #setOverlay .setPane.mobileSetOnly.active { display: block; }
+    #setOverlay .setContent { padding: 18px 14px 8px; }
+    #setOverlay .setFooter { padding: 10px 14px; }
+    #setOverlay .setShortcutGrid { grid-template-columns: 1fr; }
+    .dialog input, .dialog select, #pageJump, #zoomInput, #tbSize { font-size: 16px; }
+  }

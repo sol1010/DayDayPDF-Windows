@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup><ProjectReference Include="..\PdfEditor.Preview\PdfEditor.Preview.csproj" />
+    <Compile Include="..\PdfEditor.Preview\GitHubReleaseFeed.cs" Link="GitHubReleaseFeed.cs" />
+    <Resource Include="..\App.ico" Link="Assets\App.ico" />
+    <Compile Include="..\PdfEditor.Preview\NativeTabClosePolicy.cs" Link="NativeTabClosePolicy.cs" />
+    <Compile Include="..\PdfEditor.Preview\ShellWindowActivation.cs" Link="ShellWindowActivation.cs" />
+  </ItemGroup>
+</Project>

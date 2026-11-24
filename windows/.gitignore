@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/x64/
+*.user
+*.suo
+*.obj
+*.exp
+*.lib
+*.pdb
+Package/Assets/
+Package/Staging/
+artifacts/

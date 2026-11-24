@@ -1,0 +1,49 @@
+{
+  "docs": [
+    {
+      "name": "fixture-detached",
+      "dirty": true,
+      "fileHandle": null,
+      "pages": [
+        {
+          "src": 1,
+          "idx": 0,
+          "rot": 0,
+          "blank": null,
+          "resize": null,
+          "crop": null,
+          "texts": [
+            {
+              "type": "text",
+              "fx": 0.15,
+              "fy": 0.25,
+              "text": "Detach fixture",
+              "size": 16,
+              "color": "#111827"
+            }
+          ]
+        }
+      ],
+      "selected": [0],
+      "zoom": 1,
+      "fitWidth": true,
+      "currentPage": 0,
+      "lastSelected": 0,
+      "scrollTop": 0,
+      "undoStack": [
+        {
+          "pages": []
+        }
+      ],
+      "redoStack": []
+    }
+  ],
+  "active": 0,
+  "sources": [
+    {
+      "id": 1,
+      "name": "fixture-source.pdf",
+      "bytes": [37, 80, 68, 70]
+    }
+  ]
+}
