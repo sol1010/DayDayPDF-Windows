@@ -87,6 +87,9 @@ public sealed class TabSession : INotifyPropertyChanged
         }
     }
 
+    internal bool CanUnloadPreview => !IsDirty && !HasHistory && HasDocument && ViewReady &&
+        !RestoreFromAutosave && DocPath is not null;
+
     public bool IsDirty
     {
         get => _isDirty || IsTemporaryPrint;

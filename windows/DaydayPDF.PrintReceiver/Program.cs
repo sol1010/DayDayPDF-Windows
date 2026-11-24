@@ -46,6 +46,7 @@ internal static class Program
     {
         var active = new List<Task>();
         var waiting = CreatePipe();
+        var fast = Task.Run(() => FastPrinter.Listen(OpenInEditor, Log, stop), stop);
         ready.Set();
         try
         {
@@ -59,7 +60,7 @@ internal static class Program
                 active.Add(HandleAsync(connected, stop));
             }
         }
-        finally { waiting.Dispose(); await Task.WhenAll(active); }
+        finally { waiting.Dispose(); await Task.WhenAll(active); if (stop.IsCancellationRequested) await fast; }
     }
 
     private static async Task HandleAsync(NamedPipeServerStream pipe, CancellationToken stop)
@@ -74,14 +75,14 @@ internal static class Program
 
     internal static async Task<string?> ReceiveAsync(Stream source, CancellationToken stop)
     {
-        using var idle = CancellationTokenSource.CreateLinkedTokenSource(stop);
-        idle.CancelAfter(TimeSpan.FromMinutes(3));
+        using var reader = new SpoolReader(source, TimeSpan.FromMinutes(3), SpoolDocument.IsRendering, stop);
         byte[] signature = new byte[5];
         int count = 0;
         while (count < signature.Length)
         {
-            int read = await source.ReadAsync(signature.AsMemory(count), idle.Token);
-            if (read == 0) return null; // Local-port validation opens an empty connection.
+            int read = await reader.ReadAsync(signature.AsMemory(count));
+            if (read == 0 && count == 0) return null;
+            if (read == 0) throw new EndOfStreamException();
             count += read;
         }
         if (Encoding.ASCII.GetString(signature) != "%PDF-") throw new InvalidDataException("PDF가 아닌 인쇄 데이터입니다.");
@@ -95,8 +96,7 @@ internal static class Program
                 long length = 5;
                 while (true)
                 {
-                    idle.CancelAfter(TimeSpan.FromMinutes(3));
-                    int read = await source.ReadAsync(buffer, idle.Token);
+                    int read = await reader.ReadAsync(buffer);
                     if (read == 0) break;
                     length += read;
                     if (length > 512L * 1024 * 1024) throw new IOException("인쇄 문서가 지원 크기(512 MB)를 넘었습니다.");
@@ -108,6 +108,7 @@ internal static class Program
                 await destination.ReadExactlyAsync(tail, stop);
                 if (!Encoding.ASCII.GetString(tail).Contains("%%EOF", StringComparison.Ordinal)) throw new InvalidDataException("인쇄 PDF 수신이 완료되지 않았습니다.");
             }
+            stop.ThrowIfCancellationRequested();
             File.Move(staging, path);
             return path;
         }

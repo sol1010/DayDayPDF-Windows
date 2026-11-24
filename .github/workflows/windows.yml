@@ -16,4 +16,7 @@ jobs:
       - run: ./windows/build-release.ps1
       - run: npm test
       - run: dotnet run --project windows/PdfEditor.Output.Tests -c Release -- --update-feed
+      - run: dotnet run --project windows/PdfEditor.Output.Tests -c Release --no-build -- --spool-read
+      - run: dotnet run --project windows/PdfEditor.Output.Tests -c Release --no-build -- --print-cancel
+      - run: dotnet run --project windows/PdfEditor.Output.Tests -c Release --no-build -- --preview-memory
       - run: dotnet run --project windows/PdfEditor.Output.Tests -c Release -- --window-sizing

@@ -104,7 +104,7 @@ const server = http.createServer((req, res) => {
           await page.setViewportSize({ width, height: 950 });
           await page.keyboard.press('Control+p');
           await page.locator('#prMode').selectOption('image');
-          assert.match(await page.locator('#prInfo').textContent(), /이미지 방식은/);
+          assert.match(await page.locator('#prInfo').textContent(), /^\d+ 개 페이지 인쇄$/);
           await page.locator('#prInfo').scrollIntoViewIfNeeded();
           await page.screenshot({ path: path.join(output, `${mode}-${width}.png`) });
           await page.locator('#prCancel').click();

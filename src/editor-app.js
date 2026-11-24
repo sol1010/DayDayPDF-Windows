@@ -87,7 +87,7 @@ import { originalPrintBytes, copyOutputPages, embedResizedOutputPages, canvasIma
 import { createParallelPrintFeature } from './features/print-export/parallel-print.js';
 import { PRINT_RASTER_WORKER_SOURCE } from './workers/print-raster-worker.js?source';
 import { createPrintExportFeature } from './features/print-export/print-export.js';
-import { makePdfPrintCopy, withPrintTitle, printPaperSizes, printPaperSize, addPrintMediaRun, grayscaleCanvas } from './features/print-export/pdf-print-copy.js';
+import { makePdfPrintCopy, withPrintTitle, printPaperSizes, printPaperSize, addPrintMediaRun, alignPrinterMedia, grayscaleCanvas } from './features/print-export/pdf-print-copy.js';
 import { createEditorSecurity } from './features/document-tools/editor-security.js';
 import { createSearchViewFeature } from './features/search-view/search-view.js';
 import { createOverlayEditorFeature } from './features/overlay-editor/overlay-editor.js';
@@ -2441,14 +2441,17 @@ const thumbnailWorkerController = createThumbnailWorkerController({
   setTimer: (callback, delay) => setTimeout(callback, delay),
   clearTimer: timer => clearTimeout(timer),
 });
-const scheduleDimsSweep = pageLifecycle.scheduleDimensionSweep;
+function scheduleDimsSweep() {
+  if (!backgroundPreviewPaused) pageLifecycle.scheduleDimensionSweep();
+}
 let thumbPrepassT = null;
+let backgroundPreviewPaused = false;
 function scheduleThumbPrepass() {
   clearTimeout(thumbPrepassT);
   thumbPrepassT = setTimeout(runThumbPrepass, 800);
 }
 function runThumbPrepass() {
-  if (displayPainter.supported || printPreparing || rasterPreparing || thumbnailWorkerController.errorCount >= 2 || !editorStore.pages.length) return;
+  if (backgroundPreviewPaused || displayPainter.supported || printPreparing || rasterPreparing || thumbnailWorkerController.errorCount >= 2 || !editorStore.pages.length) return;
   const px = THUMB_RENDER_MAX;  
   thumbnailWorkerController.cancelMissingSources(new Set(editorStore.pages.map(p => p.src)));
   const items = [];
@@ -7552,7 +7555,8 @@ $('prOk').onclick = async () => {
       const copies = Number($('prCopies').value);
       const pdfPrinter = $('prPrinter').selectedOptions[0]?.dataset.pdf === 'true';
       const monochromePdf = pdfPrinter && $('prColor').value === 'mono';
-      const pageSizes = [], mediaRuns = [];
+      const pageSizes = [];
+      let mediaRuns = [];
       const collectSizes = ((paper === 'auto' || orient === 'auto') && !pdfPrinter) || mode === 'image' || monochromePdf;
       for (const page of collectSizes ? list : list.slice(0, 1)) {
         abort.signal.throwIfAborted();
@@ -7596,6 +7600,10 @@ $('prOk').onclick = async () => {
       if (pdfPrinter && !(raster && paper === 'auto' && copies === 1))
         bytes = await makePdfPrintCopy(PDFLib, bytes, { copies, orientation: orient, paper, signal: abort.signal, name });
       abort.signal.throwIfAborted();
+      if (!pdfPrinter && orient === 'auto') {
+        ({ bytes, mediaRuns } = await alignPrinterMedia(PDFLib, bytes, mediaRuns, abort.signal));
+        abort.signal.throwIfAborted();
+      }
       const result = await desktopOutput.print(bytes, {
         printer: $('prPrinter').value, copies: pdfPrinter ? 1 : copies, name,
         color: $('prColor').value, duplex: $('prDuplex').value, mediaRuns, pageCount: list.length, paper,
@@ -13084,7 +13092,26 @@ async function openDesktopSharedDocument(metadata, bytes) {
 
 function handleDesktopHostCommand(message) {
   if (!desktopViewMode || !message || typeof message !== 'object') return;
-  if (message.cmd === 'save-target') {
+  if (message.cmd === 'background-preview') {
+    const paused = message.paused === true;
+    if (backgroundPreviewPaused === paused) return;
+    backgroundPreviewPaused = paused;
+    thumbnailCoordinator.setPaused(paused);
+    if (paused) {
+      clearTimeout(thumbPrepassT);
+      pageLifecycle.invalidateSweeps();
+      thumbnailWorkerController.shutdown();
+    } else {
+      scheduleDimsSweep();
+      scheduleThumbPrepass();
+    }
+  } else if (message.cmd === 'trim-preview-cache') {
+    if (!backgroundPreviewPaused) return;
+    for (const id of sources.keys()) {
+      renderCoordinator.invalidateSource(id);
+      thumbnailCoordinator.invalidateSource(id);
+    }
+  } else if (message.cmd === 'save-target') {
     desktopCanSaveInPlace = message.canSaveInPlace === true;
     syncSaveButtons();
   } else if (message.cmd === 'prepare-document') displayPainter.warmup();
@@ -13111,6 +13138,7 @@ function handleDesktopHostCommand(message) {
   else if (message.cmd === 'flush') {
     (async () => {
       try { commitPendingNudge(); } catch {}
+      if (!autosaveEnabled && String(message.requestId).startsWith('idle-')) throw new Error('Autosave is disabled');
       if (autosaveEnabled) await doAutosave({ throwOnError: true });
       const active = editorStore.activeDocument;
       desktopHost.send({

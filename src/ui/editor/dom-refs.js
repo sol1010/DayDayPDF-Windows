@@ -18,7 +18,7 @@ export const EDITOR_DOM_IDS = Object.freeze([
   'palDrag', 'palettePop', 'palGrid', 'palHue', 'palPicker', 'palRecent',
   'palRecentWrap', 'palSV', 'palSVDot', 'pgNext', 'pgPrev', 'prCancel', 'prCustom',
   'prCustomRow', 'prInfo', 'printFrame', 'prMode', 'prOk', 'prOrient', 'prOverlay',
-  'prPreviewNav', 'prPreviewPrev', 'prPreviewNext', 'prPreviewPage', 'prPreviewTotal', 'prPreviewSource', 'prPreviewZoom', 'prPreviewStatus', 'prDuplexHint', 'prPrevBox', 'prPreview', 'prPrevLabel', 'prDesktopOptions', 'prPrinter', 'prCopies', 'prColor', 'prDuplex', 'prPaper', 'documentLicenseText', 'prRange', 'regionBar', 'regionCancel',
+  'prPreviewNav', 'prPreviewPrev', 'prPreviewNext', 'prPreviewPage', 'prPreviewTotal', 'prPreviewSource', 'prPreviewZoom', 'prPreviewStatus', 'prPrevBox', 'prPreview', 'prPrevLabel', 'prDesktopOptions', 'prPrinter', 'prCopies', 'prColor', 'prDuplex', 'prPaper', 'documentLicenseText', 'prRange', 'regionBar', 'regionCancel',
   'regionCopyCommit', 'searchBar',
   'safeSaveCancel', 'safeSaveMessage', 'safeSaveOk', 'safeSaveOverlay', 'safeSaveTitle',
   'saveErrorMessage', 'saveErrorOk', 'saveErrorOverlay', 'saveErrorTitle',

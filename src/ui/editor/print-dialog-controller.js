@@ -49,17 +49,6 @@ export function createPrintDialogController({
     preferences = normalizePrintPreferences(next, paperChoices);
     try { writePreferences(JSON.stringify(preferences)); } catch {   }
   }
-  function updateDuplexHint() {
-    if (!$('prDuplexHint')) return;
-    const pdfPrinter = $('prPrinter')?.selectedOptions[0]?.dataset.pdf === 'true';
-    $('prDuplex').disabled = pdfPrinter;
-    const message = pdfPrinter ? 'PDF로 출력할 때는 양면 설정이 적용되지 않습니다.'
-      : $('prDuplex').value === 'long' ? '종이의 긴 변을 기준으로 넘깁니다. 세로 용지는 책처럼 좌우로 넘깁니다.'
-      : $('prDuplex').value === 'short' ? '종이의 짧은 변을 기준으로 넘깁니다. 세로 용지는 달력처럼 위아래로 넘깁니다.'
-      : '종이 한쪽에만 인쇄합니다.';
-    const mixed = !pdfPrinter && $('prDuplex').value !== 'single' && ($('prPaper').value === 'auto' || $('prOrient').value === 'auto');
-    $('prDuplexHint').textContent = text(message) + (mixed ? ' ' + text('용지 크기나 방향이 바뀌면 새 용지로 시작합니다.') : '');
-  }
   function syncNavigation(indexes) {
     const count = indexes?.length || 0;
     position = Math.max(0, Math.min(position, count - 1));
@@ -77,14 +66,10 @@ export function createPrintDialogController({
     if (!visible()) return;
     const indexes = getIndexes();
     syncNavigation(indexes);
-    updateDuplexHint();
+    $('prDuplex').disabled = $('prPrinter')?.selectedOptions[0]?.dataset.pdf === 'true';
     const originalSize = !!getPrinters && $('prPaper').value === 'auto';
     $('prOrient').disabled = originalSize;
     $('prInfo').textContent = indexes?.length ? indexes.length + ' ' + text('개 페이지 인쇄') : text('범위가 올바르지 않습니다');
-    if ($('prColor')?.value === 'mono' && $('prPrinter')?.selectedOptions[0]?.dataset.pdf === 'true')
-      $('prInfo').textContent += ' · ' + text('흑백 PDF는 이미지로 저장되어 글자 검색이 지원되지 않습니다.');
-    if ($('prMode').value === 'image')
-      $('prInfo').textContent += ' · ' + text('이미지 방식은 페이지마다 변환하므로 오래 걸릴 수 있습니다.');
     target.style.visibility = 'hidden';
     const status = $('prPreviewStatus');
     status.textContent = text(indexes?.length ? '미리보기 준비 중…' : '범위가 올바르지 않습니다');
@@ -129,7 +114,8 @@ export function createPrintDialogController({
       const result = await getPrinters();
       if (currentOpening !== opening || !visible()) return;
       const printers = result.printers;
-      const chosen = printers.find(item => item.name === preferences.printer)
+      const savedPrinter = preferences.printer === 'DaydayPDF (ezPDF 고속)' ? 'DaydayPDF' : preferences.printer;
+      const chosen = printers.find(item => item.name === savedPrinter)
         || printers.find(item => item.isDefault) || printers[0];
       $('prPrinter').replaceChildren(...printers.map(printer => {
         const option = target.ownerDocument.createElement('option');

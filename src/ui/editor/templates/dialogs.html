@@ -312,10 +312,7 @@
           <div class="row"><label for="prCopies">매수</label><input id="prCopies" type="number" min="1" max="999" step="1" value="1"></div>
           <div class="row"><label for="prPaper">용지</label><select id="prPaper"><option value="auto">자동 (원본 크기)</option></select></div>
           <div class="row"><label for="prColor">색상</label><select id="prColor"><option value="color">컬러</option><option value="mono">흑백</option></select></div>
-          <div class="row"><label for="prDuplex">인쇄 면</label><select id="prDuplex" aria-describedby="prDuplexHint"><option value="single">단면 인쇄</option><option value="long">양면 · 긴 쪽 넘김</option><option value="short">양면 · 짧은 쪽 넘김</option></select></div>
-          <p id="prDuplexHint">종이 한쪽에만 인쇄합니다.</p>
-          <p class="prRememberHint">자동 용지는 페이지별 원본 크기와 방향을 사용합니다. 실제 출력은 프린터가 지원하는 용지와 인쇄 영역을 따릅니다.</p>
-          <p class="prRememberHint"><kbd>Esc</kbd>로 인쇄 준비를 취소할 수 있습니다. 전송된 작업은 Windows 인쇄 대기열에서 취소하세요.</p>
+          <div class="row"><label for="prDuplex">인쇄 면</label><select id="prDuplex"><option value="single">단면 인쇄</option><option value="long">양면 · 긴 쪽 넘김</option><option value="short">양면 · 짧은 쪽 넘김</option></select></div>
         </div>
         <div class="row"><label for="prRange">범위</label><select id="prRange">
           <option value="all">전체 페이지</option><option value="selected">선택 페이지</option><option value="custom">직접 입력</option>
@@ -328,7 +325,6 @@
           <option value="pdf">PDF (선명, 권장)</option><option value="image">이미지 (호환용)</option>
         </select></div>
         <div id="prInfo" role="status"></div>
-        <p class="prRememberHint">인쇄 옵션은 다음에도 유지됩니다. 범위는 여는 위치에 따라 정해집니다.</p>
       </div>
       <div class="btns"><button class="btn" id="prCancel">취소</button><button class="btn primary" id="prOk">인쇄</button></div>
     </div>

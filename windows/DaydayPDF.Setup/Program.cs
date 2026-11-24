@@ -64,7 +64,7 @@ internal static class Program
         panel.Children.Add(new TextBlock { Text = Product + " · " + Version, FontSize = 22, FontWeight = FontWeights.SemiBold });
         var status = new TextBlock { Margin = new Thickness(0, 18, 0, 18), TextWrapping = TextWrapping.Wrap,
             Text = uninstall ? "PC 프로그램과 설치 시 추가한 DaydayPDF 프린터를 제거합니다. 저장한 PDF와 편집기 복구 데이터는 유지됩니다."
-            : "PC 편집기를 설치하고 DaydayPDF 프린터를 추가합니다.\n다른 프로그램에서 DaydayPDF로 출력하면 저장 창 없이 편집기에서 열립니다. 인쇄 수신기는 Windows 로그인 시 백그라운드에서 시작합니다.\n\n설치 위치: " + InstallRoot };
+            : "PC 편집기와 DaydayPDF 가상 프린터를 설치합니다.\n다른 프로그램에서 DaydayPDF로 출력하면 저장 창 없이 편집기에서 열립니다. 인쇄 수신기는 Windows 로그인 시 백그라운드에서 시작합니다.\n\n설치 위치: " + InstallRoot };
         panel.Children.Add(status);
         var button = new Button { Content = uninstall ? "제거" : "설치 및 업데이트", Height = 38 };
         bool completed = false;
@@ -74,7 +74,7 @@ internal static class Program
             try {
                 await Task.Run(() => { if (uninstall) Uninstall(); else Install(); });
                 status.Text = uninstall ? "제거했습니다. 이 창을 닫으면 설치 프로그램 파일도 삭제됩니다."
-                    : "설치했습니다. 시작 메뉴에서 DaydayPDF를 실행할 수 있습니다.\n인쇄 화면에 DaydayPDF 프린터가 추가되었습니다.";
+                    : "설치했습니다. 시작 메뉴에서 DaydayPDF를 실행할 수 있습니다.";
                 button.Content = "닫기"; button.IsEnabled = true;
                 completed = true;
             } catch (Exception error) {
@@ -115,7 +115,7 @@ internal static class Program
         if (File.Exists(Executable)) using (File.Open(Executable, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
         using (var server = new LocalPrintServer())
         using (var queues = server.GetPrintQueues())
-            if (queues.Any(queue => queue.Name == Product && queue.NumberOfJobs > 0))
+            if (queues.Any(queue => (queue.Name == Product || queue.Name == "DaydayPDF (ezPDF 고속)") && queue.NumberOfJobs > 0))
                 throw new IOException("DaydayPDF 인쇄가 끝난 뒤 업데이트하세요.");
         string staging = Path.Combine(InstallRoot, "DaydayPDF.new");
         string backup = Path.Combine(InstallRoot, "DaydayPDF.previous");

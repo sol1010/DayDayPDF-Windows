@@ -12,6 +12,9 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        if (args is ["--print-cancel"]) { CheckPendingPrintCancellation().GetAwaiter().GetResult(); return 0; }
+        if (args is ["--preview-memory"]) { CheckPreviewMemory(); return 0; }
+        if (args is ["--spool-read"]) { SpoolReadChecks.Run().GetAwaiter().GetResult(); return 0; }
         if (args is ["--update-feed"]) { UpdateFeedChecks.Run().GetAwaiter().GetResult(); return 0; }
         if (args is ["--verify-public-release", var version]) { UpdateFeedChecks.VerifyPublic(Version.Parse(version)).GetAwaiter().GetResult(); return 0; }
         if (args.Length > 0 && args[0].StartsWith("--shell-activation", StringComparison.Ordinal)) return ShellActivationChecks.Run(args);
@@ -97,6 +100,47 @@ internal static class Program
             finally { application.Shutdown(); }
         };
         application.Run(); return result;
+    }
+
+    private static async Task CheckPendingPrintCancellation()
+    {
+        var wait = typeof(MainWindow).GetMethod("WaitForPrintSubmissionAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var submission = new TaskCompletionSource<CoreWebView2PrintStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellation = new CancellationTokenSource();
+        var pending = (Task)wait.Invoke(null, new object[] { submission.Task, cancellation.Token })!;
+        cancellation.Cancel();
+        try
+        {
+            await pending.WaitAsync(TimeSpan.FromSeconds(2));
+            throw new Exception("The pending print was not canceled");
+        }
+        catch (OperationCanceledException error) when (error.Data.Contains("submitted")) { }
+        submission.SetException(new IOException("Driver completed after cancellation"));
+        Console.WriteLine("Pending printer submission cancellation: PASS");
+    }
+
+    private static void CheckPreviewMemory()
+    {
+        var session = new TabSession("test", Path.Combine(Path.GetTempPath(), "saved.pdf"));
+        var type = typeof(TabSession);
+        var canUnload = type.GetProperty("CanUnloadPreview", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        bool Eligible() => (bool)canUnload.GetValue(session)!;
+        void Set(string name, bool value) => type.GetProperty(name)!.SetValue(session, value);
+        if (Eligible()) throw new Exception("Loading tab was eligible");
+        Set(nameof(TabSession.ViewReady), true);
+        Set(nameof(TabSession.HasDocument), true);
+        if (!Eligible()) throw new Exception("Clean tab could not release its preview");
+        foreach (string state in new[] { nameof(TabSession.IsDirty), nameof(TabSession.HasHistory), nameof(TabSession.RestoreFromAutosave) })
+        {
+            Set(state, true);
+            if (Eligible()) throw new Exception("Tab lost protection for " + state);
+            Set(state, false);
+        }
+        string printPath = Path.Combine(Path.GetTempPath(), "DaydayPDF", "PrintedDocuments",
+            "test_20261124_120000_00000000000000000000000000000001.pdf");
+        type.GetProperty(nameof(TabSession.DocPath))!.SetValue(session, printPath);
+        if (!session.IsTemporaryPrint || Eligible()) throw new Exception("Unsaved print tab was eligible");
+        Console.WriteLine("PASS clean preview release, loading, edits, undo, recovery and unsaved print protection");
     }
 
     private static void CheckSaveDialog()

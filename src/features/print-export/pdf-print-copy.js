@@ -13,12 +13,35 @@ export function printPaperSize(paper, orientation) {
   return orientation === 'landscape' ? [size[1], size[0]] : [...size];
 }
 
-export function addPrintMediaRun(runs, pageNumber, width, height) {
+export function addPrintMediaRun(runs, first, width, height, last = first) {
   if (![width, height].every(n => Number.isFinite(n) && n > 0)) throw new Error('페이지 크기를 확인하세요.');
   const previous = runs.at(-1);
   if (previous && Math.abs(previous.width - width) < .01 && Math.abs(previous.height - height) < .01) {
-    previous.last = pageNumber;
-  } else runs.push({ first: pageNumber, last: pageNumber, width, height });
+    previous.last = last;
+  } else runs.push({ first, last, width, height });
+}
+
+export async function alignPrinterMedia(pdfLib, bytes, runs, signal) {
+  const firstSheet = runs.find(run => run.width !== run.height);
+  const feedLandscape = firstSheet ? firstSheet.width > firstSheet.height : false;
+  const mediaRuns = [];
+  let pdf;
+  for (const { first, last, width, height } of runs) {
+    signal?.throwIfAborted();
+    const short = Math.min(width, height), long = Math.max(width, height);
+    const stock = Object.values(printPaperSizes).find(([w, h]) =>
+      Math.abs(w - short) <= .5 && Math.abs(h - long) <= .5) || [short, long];
+    addPrintMediaRun(mediaRuns, first, stock[feedLandscape ? 1 : 0], stock[feedLandscape ? 0 : 1], last);
+    if (width === height || (width > height) === feedLandscape) continue;
+    pdf ??= await pdfLib.PDFDocument.load(bytes, { updateMetadata: false });
+    const turn = feedLandscape ? 90 : 270;
+    for (let number = first; number <= last; number++) {
+      const page = pdf.getPage(number - 1);
+      page.setRotation(pdfLib.degrees((page.getRotation().angle + turn) % 360));
+    }
+  }
+  signal?.throwIfAborted();
+  return { bytes: pdf ? await pdf.save({ updateFieldAppearances: false }) : bytes, mediaRuns };
 }
 
 export async function withPrintTitle(pdfLib, bytes, name) {

@@ -27,7 +27,7 @@ public partial class MainWindow
         string defaultName = "";
         try { using var defaultQueue = LocalPrintServer.GetDefaultPrintQueue(); defaultName = defaultQueue.FullName; } catch { }
         return queues.Select(q => new { name = q.FullName, isDefault = q.FullName == defaultName,
-            isPdf = q.QueueDriver?.Name == "Microsoft Print To PDF" }).ToArray();
+            isPdf = q.QueueDriver?.Name == "Microsoft Print To PDF" || PrintInbox.IsDaydayPrinter(q.FullName, q.QueueDriver?.Name, q.QueuePort?.Name, q.Comment) }).ToArray();
     }
 
     private void BeginOutputTransfer(TabSession session, JsonElement root)
@@ -119,8 +119,8 @@ public partial class MainWindow
         {
             var queue = queues.FirstOrDefault(q => q.FullName == printer)
                 ?? throw new InvalidOperationException("선택한 프린터를 찾을 수 없습니다.");
-            pdfPrinter = queue.QueueDriver?.Name == "Microsoft Print To PDF";
-            daydayPrinter = pdfPrinter && queue.Name == "DaydayPDF" && queue.Comment == PrintInbox.PrinterComment;
+            daydayPrinter = PrintInbox.IsDaydayPrinter(queue.FullName, queue.QueueDriver?.Name, queue.QueuePort?.Name, queue.Comment);
+            pdfPrinter = daydayPrinter || queue.QueueDriver?.Name == "Microsoft Print To PDF";
         }
         int copies = GetInt32(options, "copies");
         if (copies is < 1 or > 999) throw new InvalidOperationException("인쇄 매수는 1~999 사이로 입력하세요.");
@@ -260,9 +260,8 @@ public partial class MainWindow
                     settings.PageWidth = Math.Min(run.Width, run.Height) / 72;
                     settings.PageHeight = Math.Max(run.Width, run.Height) / 72;
                     if (media.Count > 1) settings.PageRanges = $"{run.First}-{run.Last}";
-                    bool more = copy + 1 < batches || run != media[^1];
-                    progress(more, more ? "프린터 전송 중 · Esc로 남은 작업 취소" : "프린터 전송 중 · 취소는 Windows 인쇄 대기열에서");
-                    var status = await core.PrintAsync(settings);
+                    progress(true, "프린터 전송 중 · Esc로 남은 전송 취소");
+                    var status = await WaitForPrintSubmissionAsync(core.PrintAsync(settings), token);
                     if (status != CoreWebView2PrintStatus.Succeeded)
                         throw new IOException($"{name} · {run.First}–{run.Last}쪽 전송 실패 ({status}). 대기열을 확인하세요.");
                     submitted++;
@@ -278,6 +277,19 @@ public partial class MainWindow
         {
             controller?.Close();
             try { File.Delete(path); Directory.Delete(jobDirectory); } catch { }
+        }
+    }
+
+    internal static async Task<CoreWebView2PrintStatus> WaitForPrintSubmissionAsync(
+        Task<CoreWebView2PrintStatus> submission, CancellationToken token)
+    {
+        try { return await submission.WaitAsync(token); }
+        catch (OperationCanceledException error) when (token.IsCancellationRequested)
+        {
+            error.Data["submitted"] = true;
+            _ = submission.ContinueWith(task => { _ = task.Exception; }, CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            throw;
         }
     }
 

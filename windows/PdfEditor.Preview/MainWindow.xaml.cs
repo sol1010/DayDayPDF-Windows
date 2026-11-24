@@ -98,7 +98,7 @@ public partial class MainWindow : Window
     private readonly IReadOnlyList<DesktopRecoveryTab> _recoveryTabs;
     private readonly OnlineLeaseSession _onlineLease = new(PreviewAccessBypass, TimeSpan.FromMinutes(5));
     private readonly DispatcherTimer _onlineLeaseTimer = new() { Interval = TimeSpan.FromSeconds(1) };
-    private readonly DispatcherTimer _idleTimer = new() { Interval = TimeSpan.FromMinutes(1) };
+    private readonly DispatcherTimer _idleTimer = new() { Interval = TimeSpan.FromSeconds(15) };
     private readonly DispatcherTimer _startupProgressTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _startupReadyTimeoutTimer = new() { Interval = TimeSpan.FromSeconds(60) };
     private readonly DispatcherTimer _contentProgressTimer = new() { Interval = TimeSpan.FromSeconds(2) };
@@ -529,6 +529,7 @@ public partial class MainWindow : Window
             {
                 if (GetInt32(root, "apiVersion") != HostApiVersion) return;
                 session.ViewReady = true;
+                SetSessionMemoryTarget(session, IsActive && session == _activeSession);
                 if (session.PendingOpenPath is null) _ = RefreshSaveTargetAsync(session);
                 await PushAccessPolicyAsync(session);
                 await SendPendingDocumentAsync(session);
@@ -1252,6 +1253,7 @@ public partial class MainWindow : Window
         foreach (TabSession tab in NativeTabs)
             tab.IsActive = tab == session;
         _activeSession = session;
+        PendingIdleFlush.Remove(session.Id);
         session.LastViewedTimestamp = Stopwatch.GetTimestamp();
         EnsureNativeTabVisible(session);
         session.Touch();
@@ -1292,6 +1294,7 @@ public partial class MainWindow : Window
     {
         try
         {
+            if (session.ViewReady) session.Owner?.SendHostCommand(session, new { cmd = "background-preview", paused = !normal });
             if (session.WebView is { } webView)
                 webView.MemoryUsageTargetLevel = normal
                     ? CoreWebView2MemoryUsageTargetLevel.Normal
@@ -2512,24 +2515,33 @@ public partial class MainWindow : Window
 
     private void TrimInactiveControllers()
     {
-        if (_closing || !DesktopRecoveryStore.Enabled) return;
+        if (_closing) return;
+        bool lowMemory = IsPhysicalMemoryLow();
+        if (lowMemory)
+        {
+            foreach (var tab in NativeTabs)
+                if (tab.ViewReady && (tab != _activeSession || !IsActive))
+                    SendHostCommand(tab, new { cmd = "trim-preview-cache" });
+        }
+        if (!DesktopRecoveryStore.Enabled) return;
         bool overBudget = NativeTabs.Count(tab => tab.Controller is not null) > ControllerTrimThreshold;
         HashSet<Guid> recentInactive = GetRecentInactiveControllerIds();
-        foreach (TabSession session in NativeTabs.ToArray())
+        foreach (TabSession session in NativeTabs.OrderBy(tab => tab.LastUsedTimestamp))
         {
-            if (session == _activeSession || recentInactive.Contains(session.Id) ||
-                session.Controller is null || session.IsDirty || session.HasHistory ||
-                session.DocPath is null || !session.HasDocument) continue;
+            if (session == _activeSession || session == _printPreparationOwner || !session.CanUnloadPreview ||
+                (!lowMemory && recentInactive.Contains(session.Id))) continue;
             if (PendingIdleFlush.TryGetValue(session.Id, out var pending))
             {
                 if (Stopwatch.GetElapsedTime(pending.StartedTimestamp) < IdleFlushTimeout) continue;
                 PendingIdleFlush.Remove(session.Id);
             }
-            if (!session.ViewReady || session.RestoreFromAutosave ||
-                (!overBudget && Stopwatch.GetElapsedTime(session.LastUsedTimestamp) < IdleUnloadAfter)) continue;
+            var idle = Stopwatch.GetElapsedTime(session.LastUsedTimestamp);
+            if (lowMemory ? idle < TimeSpan.FromSeconds(15) : !overBudget && idle < IdleUnloadAfter) continue;
+            if (lowMemory && PendingIdleFlush.Values.Any(f => Stopwatch.GetElapsedTime(f.StartedTimestamp) < IdleFlushTimeout)) return;
             string requestId = $"idle-{session.Id:N}-{Guid.NewGuid():N}";
             PendingIdleFlush[session.Id] = (requestId, Stopwatch.GetTimestamp());
             SendHostCommand(session, new { cmd = "flush", requestId });
+            if (lowMemory) return;
         }
     }
 
@@ -2546,10 +2558,9 @@ public partial class MainWindow : Window
             !PendingIdleFlush.TryGetValue(session.Id, out var pending) ||
             !string.Equals(pending.RequestId, requestId, StringComparison.Ordinal)) return;
         PendingIdleFlush.Remove(session.Id);
-        if (!flushSucceeded || session == _activeSession ||
-            GetRecentInactiveControllerIds().Contains(session.Id) ||
-            session.IsDirty || session.HasHistory ||
-            session.DocPath is null || !session.HasDocument) return;
+        if (!flushSucceeded || !DesktopRecoveryStore.Enabled || session.Owner != this ||
+            session == _activeSession || session == _printPreparationOwner || !session.CanUnloadPreview ||
+            (!IsPhysicalMemoryLow() && GetRecentInactiveControllerIds().Contains(session.Id))) return;
         session.CloseController();
     }
 

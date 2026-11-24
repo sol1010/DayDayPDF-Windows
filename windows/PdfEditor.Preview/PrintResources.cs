@@ -19,10 +19,18 @@ public partial class MainWindow
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GlobalMemoryStatusEx(ref PrintMemoryStatus status);
 
+    private static bool ReadMemoryStatus(out PrintMemoryStatus status)
+    {
+        status = new PrintMemoryStatus { Length = (uint)Marshal.SizeOf<PrintMemoryStatus>() };
+        return GlobalMemoryStatusEx(ref status);
+    }
+
+    private static bool IsPhysicalMemoryLow() => ReadMemoryStatus(out var status) &&
+        status.AvailablePhysical < Math.Min(status.TotalPhysical / 8, 2UL * 1024 * 1024 * 1024);
+
     internal static object? GetPrintMemory()
     {
-        var status = new PrintMemoryStatus { Length = (uint)Marshal.SizeOf<PrintMemoryStatus>() };
-        if (!GlobalMemoryStatusEx(ref status)) return null;
+        if (!ReadMemoryStatus(out var status)) return null;
         return new { availablePhysicalBytes = status.AvailablePhysical,
             availableCommitBytes = status.AvailablePageFile, totalPhysicalBytes = status.TotalPhysical,
             memoryLoadPercent = status.MemoryLoad, processorCount = Environment.ProcessorCount };

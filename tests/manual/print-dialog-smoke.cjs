@@ -39,7 +39,7 @@ async function check(page,label,pc=false){
   const names=await page.locator('#prPrinter option').evaluateAll(options=>options.map(o=>({name:o.value,pdf:o.dataset.pdf==='true'})));
   const pdf=names.find(o=>o.pdf);assert.ok(pdf,'PDF printer available');await page.locator('#prPrinter').selectOption(pdf.name);
   assert.ok(await page.locator('#prDuplex').isDisabled());
-  assert.match(await page.locator('#prDuplexHint').innerText(),/PDF/);
+  assert.equal(await page.locator('#prOverlay .prFields p').count(),0);
  }
  await page.screenshot({path:path.join(out,label+'.png')});
  const box=await page.locator('#prOverlay .printDialog').boundingBox(),v=await page.evaluate(()=>({w:innerWidth,h:innerHeight}));

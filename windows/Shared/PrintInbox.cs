@@ -10,7 +10,20 @@ public static class PrintInbox
     public static string PortName => @"\\.\pipe\" + PipeName;
     public static string Root => Path.Combine(Path.GetTempPath(), "DaydayPDF", "PrintedDocuments");
     public static string LegacyRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DaydayPDF", "PrintedDocuments");
-    public const string PrinterComment = "DaydayPDF installed printer - Microsoft Print To PDF";
+    public static bool IsDaydayPrinter(string name, string? driver, string? port, string? comment) =>
+        name.Equals("DaydayPDF", StringComparison.OrdinalIgnoreCase) &&
+        ((driver == "MS Publisher Color Printer" && port == "NUL:" &&
+          (comment == "DaydayPDF installed printer - unified EMF" || HasQueueMarker())) ||
+         (driver == "Microsoft Print To PDF" && comment == "DaydayPDF installed printer - Microsoft Print To PDF"));
+
+    private static bool HasQueueMarker()
+    {
+        const string key = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Print\Printers\DaydayPDF\PrinterDriverData";
+        try { return Equals(Microsoft.Win32.Registry.GetValue(key, "DaydayPDF.QueueOwner", null), 1); }
+        catch (UnauthorizedAccessException) { return false; }
+        catch (System.Security.SecurityException) { return false; }
+        catch (IOException) { return false; }
+    }
 
     public static string NewPath(string? suggestedName = null)
     {

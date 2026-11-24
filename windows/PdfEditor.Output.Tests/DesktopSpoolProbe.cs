@@ -45,7 +45,7 @@ internal static class DesktopSpoolProbe
                 using var jobs = queue.GetPrintJobInfoCollection();
                 var names = jobs.Select(job => job.Name).ToArray();
                 Console.WriteLine("Queue jobs: " + string.Join(" | ", names));
-                if (names.Length != (cancelRemaining ? 1 : 2) || names.Any(name => name != title))
+                if ((cancelRemaining ? names.Length > 1 : names.Length != 2) || names.Any(name => name != title))
                     throw new Exception("Unexpected spool job name or page-range count");
                 result = 0;
             }

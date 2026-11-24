@@ -343,6 +343,14 @@ test('thumbnail coordinator preserves queue delays, margins, cancellation, cache
   observerCallback([{ target: near, isIntersecting: true }]);
   assert.equal(near._thumbNear, true);
   assert.equal(coordinator.has(near), true);
+  coordinator.setPaused(true);
+  const before = rendered.length;
+  coordinator.enqueue(farther);
+  await coordinator.process();
+  assert.equal(rendered.length, before);
+  coordinator.setPaused(false);
+  await coordinator.process();
+  assert.deepEqual(rendered.slice(before).map(item => item[0]).sort(), ['farther', 'near']);
 });
 
 test('page lifecycle preserves delayed cleanup and cancellable 16-page dimension sweeps', async () => {

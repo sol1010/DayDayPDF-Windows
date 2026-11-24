@@ -9,6 +9,7 @@ export const createThumbnailCoordinator = ({
   const blankImage = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
   let queueTimer = null;
   let queueBusy = false;
+  let paused = false;
   let scrolling = false;
   let scrollIdleTimer = null;
   let activeRender = null;
@@ -79,7 +80,17 @@ export const createThumbnailCoordinator = ({
     }, 250);
   }
 
+  function setPaused(value) {
+    if (paused === value) return;
+    paused = value;
+    if (paused) {
+      clearTimer(queueTimer);
+      queueTimer = null;
+    } else if (queue.size) schedule(0);
+  }
+
   function schedule(delay = 40) {
+    if (paused) return;
     if (queueTimer) {
       if (delay !== 0) return;
       clearTimer(queueTimer);
@@ -96,10 +107,10 @@ export const createThumbnailCoordinator = ({
   }
 
   async function process() {
-    if (queueBusy) return;
+    if (paused || queueBusy) return;
     queueBusy = true;
     try {
-      while (queue.size) {
+      while (!paused && queue.size) {
         if (scrolling || mainRenderPending()) {
           for (const element of [...queue]) {
             if (!element.isConnected) {
@@ -202,6 +213,7 @@ export const createThumbnailCoordinator = ({
 
   return Object.freeze({
     enqueue,
+    setPaused,
     schedule,
     process,
     observer,
