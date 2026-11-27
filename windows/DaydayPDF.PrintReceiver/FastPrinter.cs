@@ -12,7 +12,7 @@ internal static class FastPrinter
 {
     private const string Queue = "DaydayPDF";
     private const string Driver = "MS Publisher Color Printer";
-    private const uint Spooling = 8, Printing = 16, Removing = 4 | 256, Finished = 128 | 4096 | 8192;
+    private const uint Spooling = 8, Printing = 16, Removing = 4 | 256, Printed = 128, Complete = 4096;
     [StructLayout(LayoutKind.Sequential)]
     private struct Defaults { public IntPtr Type, Mode; public uint Access; }
     [StructLayout(LayoutKind.Sequential)]
@@ -24,7 +24,7 @@ internal static class FastPrinter
         public ushort Year, Month, DayOfWeek, Day, Hour, Minute, Second, Millisecond;
         public uint Elapsed, Printed;
     }
-    private sealed record Job(uint Id, string Key, string Title, uint Pages, uint Size, DateTime Submitted, string DataType, byte[] Mode);
+    private sealed record Job(uint Id, string Key, string Title, uint Pages, uint Size, DateTime Submitted, string DataType, byte[] Mode, bool Preparing);
     private sealed class PrinterHandle : SafeHandleZeroOrMinusOneIsInvalid
     {
         public PrinterHandle() : base(true) { }
@@ -53,15 +53,18 @@ internal static class FastPrinter
         if (!OpenPrinter(name, out var result, ref args)) throw new Win32Exception();
         return result;
     }
-    private static Job? Snapshot(Info data, string owner)
+    internal static bool CanReceive(uint status) => (status & Removing) == 0 && ((status & Complete) == 0 || (status & Printed) != 0);
+    private static Job? Snapshot(Info data, string owner, bool includeEmpty = false)
     {
         string submittedBy = Text(data.User);
         if (!(submittedBy.Equals(owner, StringComparison.OrdinalIgnoreCase) ||
             submittedBy.Equals(Environment.UserName, StringComparison.OrdinalIgnoreCase)) ||
             !Text(data.Printer).Equals(Queue, StringComparison.OrdinalIgnoreCase) ||
             !Text(data.Driver).Equals(Driver, StringComparison.OrdinalIgnoreCase) ||
-            (data.Status & (Spooling | Removing)) != 0 || ((data.Status & Printing) != 0 && (data.Status & Finished) == 0) ||
-            (data.Size == 0 && data.Pages == 0)) return null;
+            !CanReceive(data.Status) ||
+            (!includeEmpty && data.Size == 0 && data.Pages == 0)) return null;
+        bool preparing = (data.Status & Spooling) != 0 || ((data.Status & Printing) != 0 && (data.Status & Printed) == 0);
+        if (preparing && !Text(data.Type).StartsWith("NT EMF", StringComparison.Ordinal)) return null;
         var submitted = new DateTime(data.Year, data.Month, data.Day, data.Hour, data.Minute, data.Second, data.Millisecond, DateTimeKind.Utc);
         string key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{PrintInbox.UserKey}/{data.Id}/{submitted.Ticks}")))[..32];
         byte[] mode = [];
@@ -70,7 +73,7 @@ internal static class FastPrinter
             int n = unchecked((ushort)Marshal.ReadInt16(data.Mode, 68)) + unchecked((ushort)Marshal.ReadInt16(data.Mode, 70));
             if (n is >= 166 and <= 131072) { mode = new byte[n]; Marshal.Copy(data.Mode, mode, 0, n); }
         }
-        return new(data.Id, key, Text(data.Document), data.Pages, data.Size, submitted, Text(data.Type), mode);
+        return new(data.Id, key, Text(data.Document), data.Pages, data.Size, submitted, Text(data.Type), mode, preparing);
     }
     private static List<Job> Jobs(PrinterHandle h, string owner)
     {
@@ -95,24 +98,43 @@ internal static class FastPrinter
         }
         return result;
     }
-    private static bool Current(PrinterHandle h, Job job, string owner)
+    private static Job? State(PrinterHandle h, Job job, string owner)
     {
         GetJob(h, job.Id, 2, IntPtr.Zero, 0, out uint need);
-        if (need == 0 || need > 4 * 1024 * 1024) return false;
+        if (need == 0 || need > 4 * 1024 * 1024) return null;
         IntPtr data = Marshal.AllocHGlobal((int)need);
-        try { return GetJob(h, job.Id, 2, data, need, out _) && Snapshot(Marshal.PtrToStructure<Info>(data), owner)?.Key == job.Key; }
+        try
+        {
+            var current = GetJob(h, job.Id, 2, data, need, out _) ? Snapshot(Marshal.PtrToStructure<Info>(data), owner, true) : null;
+            return current?.Key == job.Key ? current : null;
+        }
         finally { Marshal.FreeHGlobal(data); }
     }
-    private sealed class JobStream(PrinterHandle handle) : Stream
+    private static bool Current(PrinterHandle h, Job job, string owner) => State(h, job, owner) is { Preparing: false };
+    private sealed class WaitForCompleteException : IOException { }
+    private sealed class JobStream(PrinterHandle handle, Func<bool>? stillSpooling = null, CancellationToken stop = default) : Stream
     {
         public override int Read(byte[] data, int offset, int count)
         {
             var pin = GCHandle.Alloc(data, GCHandleType.Pinned);
             try
             {
-                if (!ReadPrinter(handle, IntPtr.Add(pin.AddrOfPinnedObject(), offset), (uint)count, out uint n)) throw new Win32Exception();
-                if (n > 0) ReceiverProgress.Advanced();
-                return checked((int)n);
+                if (count == 0) return 0;
+                bool finalRead = false;
+                long started = Environment.TickCount64;
+                while (true)
+                {
+                    stop.ThrowIfCancellationRequested();
+                    if (!ReadPrinter(handle, IntPtr.Add(pin.AddrOfPinnedObject(), offset), (uint)count, out uint n)) throw new Win32Exception();
+                    if (n > 0) { ReceiverProgress.Advanced(); return checked((int)n); }
+                    if (stillSpooling == null || finalRead) return 0;
+                    finalRead = !stillSpooling();
+                    if (!finalRead)
+                    {
+                        if (Environment.TickCount64 - started >= 10000) throw new WaitForCompleteException();
+                        stop.WaitHandle.WaitOne(150);
+                    }
+                }
             }
             finally { pin.Free(); }
         }
@@ -140,20 +162,21 @@ internal static class FastPrinter
         finally { DeleteDC(dc); }
     }
     private sealed class LatePageModeException : IOException { }
-    internal static void ConvertSpool(Stream input, Stream output, byte[] mode, Func<byte[], Paper> geometry, uint expected, CancellationToken stop, bool defer = false)
+    internal static int ConvertSpool(Stream input, Stream output, byte[] mode, Func<byte[], Paper> geometry, uint expected, CancellationToken stop, bool defer = false)
     {
         var pdf = new VectorPdf(output);
         pdf.Start();
         byte[]? previous = null;
         Paper? paper = null;
-        ReadPages(input, mode, expected, (source, length, settings, token) =>
+        int count = ReadPages(input, mode, expected, (source, length, settings, token) =>
         {
             if (previous != settings) { paper = geometry(settings); previous = settings; }
             new EmfPage(pdf, paper!).Render(source, length, token);
         }, stop, defer);
         pdf.Finish();
+        return count;
     }
-    internal static void ReadPages(Stream input, byte[] mode, uint expected, Action<Stream,int,byte[],CancellationToken> render, CancellationToken stop, bool defer = false, bool ignoreModeChanges = false)
+    internal static int ReadPages(Stream input, byte[] mode, uint expected, Action<Stream,int,byte[],CancellationToken> render, CancellationToken stop, bool defer = false, bool ignoreModeChanges = false)
     {
         using var reader = new BinaryReader(input, Encoding.UTF8, true);
         EmfPage.Require(reader.ReadUInt32() == 65536);
@@ -200,13 +223,26 @@ internal static class FastPrinter
             }
         }
         EmfPage.Require(pages > 0 && pageStart < 0 && (expected == 0 || expected == pages));
+        return pages;
     }
     private static void Receive(PrinterHandle printer, Job job, string owner, Action<string> open, HashSet<string> delivered, CancellationToken stop)
     {
+        long nextQueueCheck = Environment.TickCount64 + 1500;
+        bool StillSpooling()
+        {
+            var current = State(printer, job, owner) ?? throw new WaitForCompleteException();
+            if (!current.Preparing) return false;
+            if (Environment.TickCount64 >= nextQueueCheck)
+            {
+                nextQueueCheck = Environment.TickCount64 + 1500;
+                if (Jobs(printer, owner).Any(j => !j.Preparing && j.Key != job.Key)) throw new WaitForCompleteException();
+            }
+            return true;
+        }
         void ReadJob(Action<Stream> read)
         {
             using var raw = Open(Queue + ", Job " + job.Id, 0x20020);
-            using var source = new BufferedStream(new JobStream(raw), 262144);
+            using var source = new BufferedStream(new JobStream(raw, job.Preparing ? StillSpooling : null, stop), 262144);
             read(source);
         }
         string template = PrintInbox.NewPath(job.Title);
@@ -240,15 +276,17 @@ internal static class FastPrinter
                 else
                 {
                     EmfPage.Require(job.Mode.Length >= 166 && job.DataType.StartsWith("NT EMF", StringComparison.Ordinal));
+                    int converted = 0;
+                    uint expected = job.Preparing ? 0 : job.Pages;
                     void Convert(bool defer) => ReadJob(source =>
                     {
                         using var dest = new FileStream(staging, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536);
-                        ConvertSpool(source, dest, job.Mode, m => Paper.From(m, DeviceCaps(m)), job.Pages, stop, defer);
+                        converted = ConvertSpool(source, dest, job.Mode, m => Paper.From(m, DeviceCaps(m)), expected, stop, defer);
                         dest.Flush(true);
                     });
                     try
                     {
-                        try { Convert(false); }
+                        try { Convert(job.Preparing); }
                         catch (LatePageModeException)
                         {
                             if (!Current(printer, job, owner)) return;
@@ -259,13 +297,31 @@ internal static class FastPrinter
                     catch (InvalidDataException)
                     {
                         File.Delete(staging);
-                        if (!Current(printer, job, owner)) return;
+                        if (State(printer, job, owner) == null) return;
                         ReceiverProgress.At(ReceiverStage.Converting, job.Id);
                         using var replay = new WindowsPdfReplay(staging, job.Title);
-                        ReadJob(source => ReadPages(source, job.Mode, job.Pages, replay.ReadFonts, stop, ignoreModeChanges: true));
-                        ReadJob(source => ReadPages(source, job.Mode, job.Pages, replay.Page, stop, true));
+                        if (job.Preparing)
+                        {
+                            bool first = true;
+                            ReadJob(source => converted = ReadPages(source, job.Mode, 0, (page, length, settings, token) =>
+                            {
+                                int before = replay.FontRecords;
+                                replay.ReadFonts(page, length, settings, token);
+                                if (!first && replay.FontRecords != before) throw new WaitForCompleteException();
+                                first = false;
+                                page.Position = 0;
+                                replay.Page(page, length, settings, token);
+                            }, stop, true));
+                        }
+                        else
+                        {
+                            ReadJob(source => ReadPages(source, job.Mode, expected, replay.ReadFonts, stop, ignoreModeChanges: true));
+                            ReadJob(source => converted = ReadPages(source, job.Mode, expected, replay.Page, stop, true));
+                        }
                         replay.Finish(stop);
                     }
+                    if (job.Preparing && (State(printer, job, owner) is not { Preparing: false } final ||
+                        (final.Pages != 0 && final.Pages != converted))) throw new WaitForCompleteException();
                 }
                 if (!Current(printer, job, owner)) return;
                 File.Move(staging, path);
@@ -301,6 +357,7 @@ internal static class FastPrinter
     {
         string owner = WindowsIdentity.GetCurrent().Name;
         var failed = new Dictionary<string, Retry>();
+        var waitForComplete = new HashSet<string>();
         var delivered = new HashSet<string>();
         while (!stop.IsCancellationRequested)
         {
@@ -311,15 +368,21 @@ internal static class FastPrinter
                 var jobs = Jobs(printer, owner);
                 var active = jobs.Select(j => j.Key).ToHashSet();
                 delivered.IntersectWith(active);
+                waitForComplete.IntersectWith(active);
                 foreach (string gone in failed.Keys.Except(active).ToArray()) failed.Remove(gone);
                 if (deferredJob != 0 && jobs.Count > 1) jobs = jobs.OrderBy(j => j.Id == deferredJob).ToList();
-                foreach (var job in jobs)
+                foreach (var job in jobs.OrderBy(j => j.Preparing))
                 {
+                    if (job.Preparing && waitForComplete.Contains(job.Key)) continue;
                     failed.TryGetValue(job.Key, out var previous);
                     if (previous?.Wait(job.Size, job.Pages, Environment.TickCount64) == true) continue;
                     stop.ThrowIfCancellationRequested();
                     ReceiverProgress.At(ReceiverStage.Reading, job.Id);
                     try { Receive(printer, job, owner, open, delivered, stop); failed.Remove(job.Key); }
+                    catch (Exception e) when (job.Preparing && e is WaitForCompleteException or InvalidDataException or Win32Exception or EndOfStreamException)
+                    {
+                        waitForComplete.Add(job.Key);
+                    }
                     catch (Exception e) when (e is not OperationCanceledException)
                     {
                         var next = Retry.After(previous, job.Size, job.Pages, Environment.TickCount64);

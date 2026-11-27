@@ -167,8 +167,8 @@ export function createDisplayPainter({ painter, getSource, getWasmBinary, pdfium
       Promise.resolve().then(() => source.doc?.getFieldObjects?.()).then(fields => !fields, () => false));
     return eligibility.get(source);
   }
-  function usesNative(model) {
-    return !model.blank && !model.resize && eligible(getSource(model.src));
+  function usesNative(model, output = false) {
+    return !model.blank && (!model.resize || output) && eligible(getSource(model.src));
   }
   async function paintRegion(model, canvas, scale, dpr = 1, region = null, hook = null, options = {}) {
     let stopped = false, job = null, fallbackTask = null;
@@ -181,7 +181,7 @@ export function createDisplayPainter({ painter, getSource, getWasmBinary, pdfium
     hook?.(task);
     try {
       const source = getSource(model.src);
-      if (await usesNative(model)) {
+      if (await usesNative(model, !!options.samples)) {
         try {
           if (stopped) throw cancelled();
           const spec = await painter.getRenderSpec(model, scale * dpr, region);
@@ -238,7 +238,7 @@ export function createDisplayPainter({ painter, getSource, getWasmBinary, pdfium
       const tileOptions = { ...options, samples, pixelRatio: [sx / ratio, sy / ratio] };
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d'), tile = createCanvas();
-      const native = await usesNative(model);
+      const native = await usesNative(model, true);
       let boxes = null;
       if (native) {
         const spec = await painter.getRenderSpec(model, ratio * samples);

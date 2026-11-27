@@ -72,12 +72,17 @@ internal sealed class EmfPage(VectorPdf pdf, Paper paper)
         });
     }
 
-    private void Vector(ReadOnlySpan<byte> data)
+    internal static string DrawingBody(ReadOnlySpan<byte> data)
     {
         int start = data.IndexOf("GpPBeg1\r\n"u8);
         Require(start >= 0 && data.EndsWith("GSE\r\n"u8));
         if (start > 0) Require(SHA256.HashData(data[..start]).AsSpan().SequenceEqual(VectorPrologue));
-        string body = Encoding.ASCII.GetString(data[(start + 9)..^5]);
+        return Encoding.ASCII.GetString(data[(start + 9)..^5]);
+    }
+
+    private void Vector(ReadOnlySpan<byte> data)
+    {
+        string body = DrawingBody(data);
         int begin = body.IndexOf("NP ", StringComparison.Ordinal), last = body.LastIndexOf(' ');
         if (begin >= 0 && last >= begin + 3 && body.EndsWith("\r\n", StringComparison.Ordinal))
         {

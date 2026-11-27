@@ -72,3 +72,14 @@ test('a direct single content stream is restored without depending on an array w
  const r=await prepareMarkedRestoration(await d.save(),P,sanitize,options);
  assert.equal(r.restored.pageTexts[0].length,1);assert.deepEqual(await content(r.restored.bytes,0),[]);
 });
+
+test('large unmarked drawing streams do not hide a later editable overlay', async () => {
+  const drawing = '0 0 m 1 1 l S\n'.repeat(75000);
+  const bytes = await fixture([[...Array(17).fill(drawing), owned()]]);
+  const result = await prepareMarkedRestoration(bytes, P, sanitize, options);
+  assert.deepEqual([...result.candidates], [0]);
+  assert.equal(result.restored?.pageTexts[0].length, 1);
+  const streams = await content(result.restored.bytes, 0);
+  assert.equal(streams.length, 17);
+  assert.ok(streams.every(stream => stream === drawing));
+});

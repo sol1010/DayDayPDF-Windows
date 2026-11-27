@@ -120,6 +120,8 @@ internal sealed class WindowsPdfReplay : IDisposable
         return checked((int)Math.Round(sheet is null ? pixel - GetDeviceCaps(dc, 112 + axis) : pixel * sheet.Scale));
     }
 
+    internal int FontRecords { get; private set; }
+
     internal void ReadFonts(Stream input, int length, byte[] mode, CancellationToken stop)
     {
         Span<byte> header = stackalloc byte[8];
@@ -145,6 +147,7 @@ internal sealed class WindowsPdfReplay : IDisposable
                         buffer.AsSpan(0, 12).CopyTo(record.AsSpan(8));
                         input.ReadExactly(record, 20, size - 20);
                         fonts.Read(record);
+                        FontRecords++;
                         continue;
                     }
                     size -= 12;
@@ -164,27 +167,8 @@ internal sealed class WindowsPdfReplay : IDisposable
     {
         if (input is not MemoryStream memory || !memory.TryGetBuffer(out var segment) ||
             segment.Offset != 0 || segment.Count != length) throw new InvalidDataException();
-        byte[] page = segment.Array!;
-        if (BitConverter.ToInt32(page) != 1 || BitConverter.ToInt32(page, 48) != length ||
-            !page.AsSpan(40, 4).SequenceEqual(" EMF"u8)) throw new InvalidDataException("인쇄 페이지 형식이 잘못되었습니다.");
-        int type = 0;
-        for (int at = 0; at < length;)
-        {
-            stop.ThrowIfCancellationRequested();
-            ReceiverProgress.Advanced();
-            if (length - at < 8) throw new InvalidDataException();
-            type = BitConverter.ToInt32(page, at);
-            int size = BitConverter.ToInt32(page, at + 4);
-            if (size < 8 || (size & 3) != 0 || size > length - at || (type == 14 && size != length - at)) throw new InvalidDataException();
-            if (type is 105 or 106 or 110)
-            {
-                const int getTechnology = 20;
-                if (type != 106 || size != 16 || BitConverter.ToInt32(page, at + 8) != getTechnology || BitConverter.ToInt32(page, at + 12) != 0)
-                    throw new InvalidDataException("지원하지 않는 프린터 전용 명령이 포함된 작업입니다.");
-            }
-            at += size;
-        }
-        if (type != 14) throw new InvalidDataException("인쇄 페이지가 완성되지 않았습니다.");
+        byte[] page = MixedEmfPage.Prepare(segment.Array!, length, stop);
+        if (!ReferenceEquals(page, segment.Array)) length = page.Length;
         SetPaper(mode);
         if (!active)
         {
@@ -197,10 +181,12 @@ internal sealed class WindowsPdfReplay : IDisposable
         var frame = new Rect { Left = Position(page, 24, 0), Top = Position(page, 28, 1), Right = Position(page, 32, 0), Bottom = Position(page, 36, 1) };
         if (frame.Right <= frame.Left || frame.Bottom <= frame.Top) throw new InvalidDataException("인쇄 영역이 잘못되었습니다.");
         var emf = SetEnhMetaFileBits((uint)length, page);
-        if (emf == IntPtr.Zero) throw new Win32Exception();
+        if (emf == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error(), "Windows가 인쇄 메타파일을 열지 못했습니다.");
         try
         {
-            if (StartPage(dc) <= 0 || !PlayEnhMetaFile(dc, emf, ref frame) || EndPage(dc) <= 0) throw new Win32Exception();
+            if (StartPage(dc) <= 0) throw new Win32Exception(Marshal.GetLastWin32Error(), "PDF 페이지를 시작하지 못했습니다.");
+            if (!PlayEnhMetaFile(dc, emf, ref frame)) throw new Win32Exception(Marshal.GetLastWin32Error(), "Windows가 인쇄 메타파일을 재생하지 못했습니다.");
+            if (EndPage(dc) <= 0) throw new Win32Exception(Marshal.GetLastWin32Error(), "PDF 페이지를 끝내지 못했습니다.");
             pages.Add(sheet);
         }
         finally { DeleteEnhMetaFile(emf); }

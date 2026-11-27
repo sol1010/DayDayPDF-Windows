@@ -53,6 +53,11 @@ namespace DaydayPDF.PrintReceiver
                 return ReceiverSupervisor.Worker(token, int.Parse(pid), uint.Parse(job));
             if (!string.IsNullOrEmpty(PrintInbox.UserKey)) return ReceiverSupervisor.Run();
 
+            if (args is ["--replay-spool", var spool, var mode, var pdf])
+            {
+                ConversionChecks.Replay(spool, mode, pdf);
+                return 0;
+            }
             ConversionChecks.Run();
             Environment.SetEnvironmentVariable("DAYDAY_RECEIVER_TEST", "DaydayPDF.Test." + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(PrintInbox.Root);

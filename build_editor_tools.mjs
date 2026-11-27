@@ -13,6 +13,9 @@ export async function buildEditorTools(destination) {
   await build({ entryPoints: [resolve(root, 'src/tools/editor-security-runtime.js')],
     outfile: resolve(web, 'assets/editor-tools/security.js'), bundle: true, minify: true,
     platform: 'browser', format: 'esm', target: 'es2022', legalComments: 'linked' });
+  await build({ entryPoints: [resolve(root, 'src/workers/marked-recovery.js')],
+    outfile: resolve(web, 'assets/editor-tools/marked-recovery.js'), bundle: true, minify: true,
+    platform: 'browser', format: 'iife', target: 'es2022', legalComments: 'linked' });
   const copies = [
     ['node_modules/qpdf-run/src/worker.js', 'assets/qpdf/qpdf-worker.js'],
     ['node_modules/qpdf-run/vendor/qpdf/lib/qpdf.js', 'assets/qpdf/qpdf.js'],

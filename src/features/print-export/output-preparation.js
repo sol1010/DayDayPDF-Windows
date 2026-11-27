@@ -57,7 +57,7 @@ export async function canvasImageBlob(canvas, type, quality) {
 }
 
 export async function drawCanvasRgb(output, page, canvas, pdfLib,
-  Compression = globalThis.CompressionStream) {
+  Compression = globalThis.CompressionStream, signal) {
   if (typeof Compression !== 'function') return false;
   const stream = new Compression('deflate'), writer = stream.writable.getWriter();
   const result = new Response(stream.readable).arrayBuffer();
@@ -66,6 +66,7 @@ export async function drawCanvasRgb(output, page, canvas, pdfLib,
   const stripHeight = Math.max(1, Math.min(128, Math.floor(1048576 / width)));
   try {
     for (let y = 0; y < height; y += stripHeight) {
+      signal?.throwIfAborted();
       const rows = Math.min(stripHeight, height - y);
       const rgba = context.getImageData(0, y, width, rows).data;
       const rgb = new Uint8Array(width * rows * 3);
@@ -83,6 +84,7 @@ export async function drawCanvasRgb(output, page, canvas, pdfLib,
     }
     await writer.close();
     const data = new Uint8Array(await result);
+    signal?.throwIfAborted();
     const image = output.context.stream(data, { Type: 'XObject', Subtype: 'Image',
       Width: width, Height: height, BitsPerComponent: 8, ColorSpace: 'DeviceRGB', Filter: 'FlateDecode' });
     const name = page.node.newXObject('Raster', output.context.register(image));
@@ -139,7 +141,7 @@ export function createRasterOutputFeature({ pdfLib, getViewport, paintPage, draw
     const { type = 'image/png', quality = 1 } = options;
     const state = await render(pages, options, async (canvas, viewport) => {
       const page = output.addPage([viewport.width, viewport.height]);
-      if (type === 'image/png' && await drawCanvasRgb(output, page, canvas, pdfLib)) return;
+      if (type === 'image/png' && await drawCanvasRgb(output, page, canvas, pdfLib, undefined, options.signal)) return;
       const bytes = await canvasImageBytes(canvas, type, quality);
       if (type === 'image/png') {
         if (drawOpaquePng(output, page, bytes, pdfLib)) return;
@@ -147,7 +149,10 @@ export function createRasterOutputFeature({ pdfLib, getViewport, paintPage, draw
       const image = type === 'image/png' ? await output.embedPng(bytes) : await output.embedJpg(bytes);
       page.drawImage(image, { x: 0, y: 0, width: viewport.width, height: viewport.height });
     });
-    return { ...state, bytes: new Uint8Array(await output.save({ useObjectStreams: false })) };
+    options.signal?.throwIfAborted();
+    const bytes = await output.save({ useObjectStreams: false });
+    options.signal?.throwIfAborted();
+    return { ...state, bytes: new Uint8Array(bytes) };
   }
   return Object.freeze({ render, buildPdf });
 }

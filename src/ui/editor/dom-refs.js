@@ -27,7 +27,7 @@ export const EDITOR_DOM_IDS = Object.freeze([
   'setLicenseAppVer', 'setOverlay', 'setRecDel', 'setRecInfo', 'setRecOpen', 'setReset', 'setSave',
   'setStartupMode', 'sfClose',
   'sfCount', 'sfInput', 'sfNext', 'sfPrev', 'shapeMenu', 'sidebar', 'sideGrip',
-  'shapeTextBar', 'spinner', 'spinnerMsg', 'stAlign', 'stBold', 'stColor', 'stColorOp',
+  'shapeTextBar', 'spinner', 'spinnerMsg', 'rasterCancel', 'stAlign', 'stBold', 'stColor', 'stColorOp',
   'stFile', 'stFont', 'stFontButton', 'stFontLabel', 'stPin', 'stPinIcon', 'stSel', 'stSize', 'stValign',
   'szCancel', 'szCount', 'szCustomRow',
   'szH', 'szOk', 'szOrient', 'szOverlay', 'szPreset', 'szReset', 'szW', 'tabbar',

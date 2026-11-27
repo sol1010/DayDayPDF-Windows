@@ -13,7 +13,7 @@ const server = http.createServer((req, res) => {
     if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) continue;
     res.setHeader('Content-Type', mime[path.extname(file)] || 'application/octet-stream');
     if (relative === 'view.html') {
-      const html = fs.readFileSync(file, 'utf8').replace('mountEditorControllers();', 'window.__multiPrint={resizeAll(){editorStore.pages.forEach(p=>{p.resize=[400,650];p.rot=90;p.crop=[.1,.05,.8,.9];});rebuildAll();}};mountEditorControllers();');
+      const html = fs.readFileSync(file, 'utf8').replace('async function prepare({ first, last }, signal) {', 'async function prepare({ first, last }, signal) { window.testTimeline.push(["prepare",first,last]);').replace('mountEditorControllers();', 'window.__multiPrint={resizeAll(){editorStore.pages.forEach(p=>{p.resize=[400,650];p.rot=90;p.crop=[.1,.05,.8,.9];});rebuildAll();}};mountEditorControllers();');
       res.end(html);
     } else fs.createReadStream(file).pipe(res); return;
   }
@@ -41,7 +41,7 @@ const server = http.createServer((req, res) => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>{
    localStorage.setItem('pdfEditor.startupMode','blank');localStorage.setItem('pdfEditor.tutorialSeen','1');
-   const handlers=new Map(),buffers=new Map();window.testMessages=[];window.testOutputs=[];
+   const handlers=new Map(),buffers=new Map();window.testMessages=[];window.testOutputs=[];window.testTimeline=[];
    window.testDispatch=(name,event)=>(handlers.get(name)||[]).forEach(fn=>fn(event));
    const reply=data=>queueMicrotask(()=>testDispatch('message',{data}));
    Object.defineProperty(window.chrome,'webview',{value:{
@@ -57,7 +57,8 @@ const server = http.createServer((req, res) => {
      }
      if(message.type==='output-put-done'){
       const item=buffers.get(message.requestId);buffers.delete(message.requestId);testOutputs.push({bytes:new Uint8Array(item.buffer),options:item.options});
-      reply({cmd:'output-result',requestId:message.requestId,ok:true});
+      const ack=()=>{testTimeline.push(['ack',item.options.pageCount]);reply({cmd:'output-result',requestId:message.requestId,ok:true});};
+      if(item.options.printer==='QA physical sink')setTimeout(ack,150);else ack();
      }
     }
    }});
@@ -73,17 +74,36 @@ const server = http.createServer((req, res) => {
    await page.keyboard.press('Control+p');await page.waitForFunction(()=>document.querySelector('#prPrinter option[value="QA PDF"]'));
    await page.locator('#prPrinter').selectOption(printer);await page.locator('#prCopies').fill(copies);
    await page.locator('#prPaper').selectOption('a3');await page.locator('#prOrient').selectOption('landscape');await page.locator('#prMode').selectOption('pdf');await page.locator('#prColor').selectOption('color');
-   await page.locator('#prOk').click();await page.waitForFunction(index=>testOutputs.length>index,index);
-   const result=await page.evaluate(index=>({bytes:Array.from(testOutputs[index].bytes),options:testOutputs[index].options}),index);
-   const data=new Uint8Array(result.bytes),doc=await PDFDocument.load(data);
+   await page.locator('#prOk').click();
+   await page.waitForFunction(index=>testMessages.filter(m=>m.type==='output-resources'&&m.action==='end').length>index,index);
+   const parts=await page.evaluate(index=>testOutputs.slice(index).map(p=>({bytes:Array.from(p.bytes),options:p.options})),index);
+   assert.deepEqual(parts.map(p=>p.options.pageCount), index===0?[30]:[1,8,8,8,5]);
+   if(index===1){
+    const timeline=await page.evaluate(()=>testTimeline);
+    const prepared=timeline.findIndex(e=>e[0]==='prepare'&&e[1]===2);
+    const ack=timeline.findIndex(e=>e[0]==='ack'&&e[1]===1);
+    assert.ok(prepared>=0&&prepared<ack,JSON.stringify(timeline));
+   }
+   const result=parts[0];
+   let data=new Uint8Array(result.bytes),doc=await PDFDocument.load(data);
+   if(parts.length>1){
+    doc=await PDFDocument.create();
+    for(const part of parts){
+     const batch=await PDFDocument.load(new Uint8Array(part.bytes));
+     assert.equal(batch.getPageCount(),part.options.pageCount);
+     assert.equal(part.options.printer,printer);
+     for(const p of await doc.copyPages(batch,batch.getPageIndices()))doc.addPage(p);
+    }
+    data=await doc.save();
+   }
    const images=doc.context.enumerateIndirectObjects().filter(([,v])=>v instanceof pdfLib.PDFRawStream&&v.dict.get(pdfLib.PDFName.of('Subtype'))===pdfLib.PDFName.of('Image')).length;
-   assert.equal(doc.getPageCount(),index===0?60:30);assert.equal(images,1);assert.ok(data.length<bytes.length*1.2);
+   assert.equal(doc.getPageCount(),index===0?60:30);assert.equal(images,parts.length);assert.ok(parts.every(p=>p.bytes.length<bytes.length*1.2));
    assert.equal(result.options.copies,1);assert.equal(result.options.printer,printer);
    const textPages=await page.evaluate(async bytes=>{
     const pdfjs=await import('/assets/pdfjs/6.2.108/legacy/build/pdf.min.mjs');pdfjs.GlobalWorkerOptions.workerSrc='/assets/pdfjs/6.2.108/legacy/build/pdf.worker.min.mjs';
     const doc=await pdfjs.getDocument({data:new Uint8Array(bytes)}).promise;
-    try {const indexes=doc.numPages===60?[1,30,31,60]:[1,30];return await Promise.all(indexes.map(async n=>({page:n,text:(await (await doc.getPage(n)).getTextContent()).items.map(i=>i.str).join(' ')})));}finally{await doc.loadingTask.destroy();}
-   },result.bytes);
+    try {const indexes=doc.numPages===60?[1,30,31,60]:[1,30];return await Promise.all((doc.numPages===30?Array.from({length:30},(_,i)=>i+1):indexes).map(async n=>({page:n,text:(await (await doc.getPage(n)).getTextContent()).items.map(i=>i.str).join(' ')})));}finally{await doc.loadingTask.destroy();}
+   },Array.from(data));
    for(const item of textPages)assert.ok(item.text.includes('DRAWING PAGE '+((item.page-1)%30+1)),JSON.stringify(item));
    if(index===0)for(const item of textPages.filter(p=>p.page===1||p.page===31))
      assert.ok(item.text.includes('PRINT FIELD'),'Printable form disappeared on page '+item.page);
@@ -92,7 +112,7 @@ const server = http.createServer((req, res) => {
      assert.ok(textPages.filter(p=>p.page===30||p.page===60).every(p=>p.text.includes('PRINT STAMP')));
    }
    fs.writeFileSync(path.join(output,'print-'+index+'.pdf'),data);
-   results.push({printer,originalBytes:bytes.length,printBytes:data.length,pages:doc.getPageCount(),images});
+   results.push({printer,originalBytes:bytes.length,printBytes:data.length,pages:doc.getPageCount(),batches:parts.map(p=>p.options.pageCount),images});
   }
   await page.evaluate(()=>{window.qaPrinters=[{name:'QA PDF',isDefault:true,isPdf:true}];});
   await page.keyboard.press('Control+p');

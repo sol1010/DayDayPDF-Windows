@@ -44,6 +44,12 @@ internal static class ShellClipboardBroker
         return true;
     }
 
+    public static void CancelPut(TabSession session, string requestId)
+    {
+        if (Pending.TryGetValue(requestId, out var pending) && pending.Session == session)
+            RemovePending(requestId);
+    }
+
     public static bool CommitPut(TabSession session, string requestId)
     {
         if (!Pending.Remove(requestId, out PendingPut? pending) || pending.Session != session)

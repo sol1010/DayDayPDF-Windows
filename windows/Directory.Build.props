@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
-    <PreviewPackageVersion>26.11.27.3</PreviewPackageVersion>
-    <PreviewDisplayVersion>26.11.27.3</PreviewDisplayVersion>
+    <PreviewPackageVersion>26.11.27.7</PreviewPackageVersion>
+    <PreviewDisplayVersion>26.11.27.7</PreviewDisplayVersion>
     <PreviewChannel>PC</PreviewChannel>
     <Deterministic>true</Deterministic>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>

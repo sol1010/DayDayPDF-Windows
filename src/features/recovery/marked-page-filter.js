@@ -1,8 +1,35 @@
-async function inspectMarkedPages(bytes, pdfLib, { expectedPages, maxDecodedBytes = 16 * 1024 * 1024,
+async function readContent(stream, pdfLib, limit) {
+  const filter = stream.dict.get(pdfLib.PDFName.of('Filter'));
+  const native = typeof DecompressionStream === 'function' && stream.contents.length >= 2048 &&
+    String(filter) === '/FlateDecode' && !stream.dict.has(pdfLib.PDFName.of('DecodeParms'));
+  const reader = native ? new Blob([stream.contents]).stream().pipeThrough(new DecompressionStream('deflate')).getReader() : null;
+  const decoder = reader ? null : pdfLib.decodePDFRawStream(stream);
+  const chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const data = reader ? (await reader.read()).value : decoder.getBytes(Math.min(65536, limit - size + 1));
+      if (!data?.length) break;
+      size += data.length;
+      if (size > limit) {
+        if (reader) await reader.cancel();
+        return null;
+      }
+      chunks.push(data);
+    }
+  } finally { reader?.releaseLock(); }
+  if (chunks.length === 1) return chunks[0];
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  return bytes;
+}
+
+async function inspectMarkedPages(bytes, pdfLib, { expectedPages, maxDecodedBytes = 64 * 1024 * 1024,
   yieldControl = () => new Promise(resolve => setTimeout(resolve, 0)) } = {}) {
   try {
-    const { PDFDocument, PDFArray, PDFRawStream, decodePDFRawStream } = pdfLib;
-    const document = await PDFDocument.load(bytes, { updateMetadata: false });
+    const { PDFDocument, PDFArray, PDFRawStream } = pdfLib;
+    const document = await PDFDocument.load(bytes, { updateMetadata: false, parseSpeed: 1500 });
     const candidates = new Set(), markedStreams = new Map(), uncertain = new Set(), decoder = new TextDecoder('latin1');
     const pages = document.getPages();
     if (expectedPages !== undefined && pages.length !== expectedPages) return null;
@@ -15,8 +42,8 @@ async function inspectMarkedPages(bytes, pdfLib, { expectedPages, maxDecodedByte
         let tail = '', remaining = maxDecodedBytes;
         for (const stream of streams) {
           if (!(stream instanceof PDFRawStream)) { candidates.add(index); uncertain.add(index); break; }
-          const decoded = decodePDFRawStream(stream).getBytes(remaining + 1);
-          if (decoded.length > remaining) { candidates.add(index); uncertain.add(index); break; }
+          const decoded = await readContent(stream, pdfLib, remaining);
+          if (!decoded) { candidates.add(index); uncertain.add(index); break; }
           remaining -= decoded.length;
           const text = (tail + decoder.decode(decoded)).replace(/#([0-9a-f]{2})/gi,
             (_,hex) => String.fromCharCode(parseInt(hex,16)));
@@ -119,6 +146,6 @@ export async function prepareMarkedRestoration(bytes, pdfLib, sanitize, options)
       replacements.push({page,kept});pageTexts[index]=objects;
     }
     for(const {page,kept} of replacements)page.node.set(pdfLib.PDFName.of('Contents'),document.context.obj(kept));
-    return {candidates,restored:{bytes:await document.save(),pageTexts}};
+    return {candidates,restored:{bytes:await document.save({objectsPerTick:1500}),pageTexts}};
   } catch { return {candidates,restored:null}; }
 }

@@ -792,6 +792,13 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (type == "clipboard-put-cancel")
+            {
+                if (GetString(root, "requestId") is string requestId)
+                    ShellClipboardBroker.CancelPut(session, requestId);
+                return;
+            }
+
             if (type == "clipboard-put-done")
             {
                 string? requestId = GetString(root, "requestId");

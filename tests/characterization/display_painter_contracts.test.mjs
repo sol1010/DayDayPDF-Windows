@@ -97,6 +97,20 @@ test('forms, XFA, protected files and unsupported environments retain the existi
   const x = setup({ supported: false }); await x.painter.paintPage(x.page(), x.canvas(), 1); assert.equal(x.fallback.length, 1);
 });
 
+test('sampled export of a resized page sends fitting offsets and tile bounds to the worker', async () => {
+  const x = setup(), page = { ...x.page(), resize: [400, 500] };
+  const paint = x.painter.paintRegion(page, x.canvas(), 4, 1, { x: 8, y: 12, width: 120, height: 80 },
+    null, { samples: 2, pixelRatio: [1, 1] });
+  await tick();
+  const message = x.workers[0].messages.find(m => m.type === 'paint');
+  assert.deepEqual([message.samples, message.x, message.y, message.fullWidth, message.fullHeight,
+    message.width, message.height], [2, -15, -10, 200, 100, 480, 320]);
+  x.workers[0].finish();
+  await paint;
+  assert.equal(x.fallback.length, 0);
+  x.painter.shutdown();
+});
+
 test('large WASM heaps are released after transferring the completed image', async () => {
   const x = setup(), c = x.canvas(); const promise = x.painter.paintPage(x.page(), c, 1);
   await tick(); x.workers[0].finish({ heapBytes: 600 * 1024 * 1024 }); await promise;

@@ -1,5 +1,6 @@
 import { createTextOverlayLayout } from './rendering/text-overlay-layout.js';
 import { resizeObjectBox, objectReflectionMatrix, originalResizeMatrix } from './core/object-resize.js';
+import { startOpeningReader } from './ui/editor/opening-reader.js';
 import { prepareMarkedRestoration } from './features/recovery/marked-page-filter.js';
 import { INK_BRUSHES, createInkObject, inkGeometry, inkSvgPath } from './core/ink.js';
 import { fragmentStroke, fragmentStrokeBounds, applyFragmentStrokes, cropFragmentStrokes, maskEmbeddedFragment, replacePdfObjectForm, drawEraserTip, eraserBounds, eraseCanvasStroke, replacePdfObjectBitmap } from './features/overlay-editor/object-eraser.js';
@@ -87,7 +88,7 @@ import { originalPrintBytes, copyOutputPages, embedResizedOutputPages, canvasIma
 import { createParallelPrintFeature } from './features/print-export/parallel-print.js';
 import { PRINT_RASTER_WORKER_SOURCE } from './workers/print-raster-worker.js?source';
 import { createPrintExportFeature } from './features/print-export/print-export.js';
-import { makePdfPrintCopy, withPrintTitle, printPaperSizes, printPaperSize, addPrintMediaRun, alignPrinterMedia, grayscaleCanvas } from './features/print-export/pdf-print-copy.js';
+import { makePdfPrintCopy, withPrintTitle, printPaperSizes, printPaperSize, addPrintMediaRun, alignPrinterMedia, printFeedRuns, printBatches, submitPrintBatches, grayscaleCanvas } from './features/print-export/pdf-print-copy.js';
 import { createEditorSecurity } from './features/document-tools/editor-security.js';
 import { createSearchViewFeature } from './features/search-view/search-view.js';
 import { createOverlayEditorFeature } from './features/overlay-editor/overlay-editor.js';
@@ -832,6 +833,7 @@ function applySnap(s) {
   if (origMode) origDecorateVisible();
 }
 function markActiveDocumentChanged() {
+  originalDesktopFiles.delete(editorStore.activeDocument);
   if (markChanged(editorStore.activeDocument)) renderTabs();
 }
 function pushSnap(s) {
@@ -1837,7 +1839,7 @@ async function openFiles(files, append) {
       return true;
     }
   }
-  let openedAny = false;
+  let openedAny = false, openingReader = null;
   displayPainter.warmup();
   spin(true, 'PDF 여는 중...');
   try {
@@ -1881,6 +1883,8 @@ async function openFiles(files, append) {
           }
           const openedPdf = await openPdfBytesInteractive(source.bytes, f.name);
           const bytes = openedPdf.bytes, pdoc = openedPdf.pdoc;  
+          if (desktopViewMode && !editorStore.activeDocument && !openedPdf.openedWithPassword && bytes.length >= 2 * 1024 * 1024)
+            openingReader = startOpeningReader(viewer, pdoc, preview, uiText);
           let d = await tryOpenProject(f, pdoc);
           if (!d) d = await tryOpenMarked(f, pdoc, bytes);  
           if (d) restored++;
@@ -1894,6 +1898,7 @@ async function openFiles(files, append) {
             sources.set(id, plainSource);
             d.srcIds.push(id);
             d.pages.push(...documentModel.createSourcePages(id, pdoc.numPages));
+            if (!openedPdf.openedWithPassword) rememberDesktopFile(d, plainSource, bytes);
             if (!first && !locked && !openedPdf.openedWithPassword && bytes.length >= 2 * 1024 * 1024) {
               openingPage = d.pages[0];
               openingRaster = preview;
@@ -1911,8 +1916,19 @@ async function openFiles(files, append) {
         finally { if (primedId && !sources.has(primedId)) displayPainter.invalidateSource(primedId); }
       }
       if (first) {
+        const reading = openingReader?.finish();
+        openingReader = null;
+        const target = Math.min(reading?.number || 1, first.pages.length);
+        if (target > 1) first.currentPage = target - 1;
         switchDoc(first);
-        if (openingPage && first.pages[0] === openingPage) showOpeningPreview(openingPage, openingRaster);
+        if (target > 1) gotoPage(target, {restore: false});
+        if (reading?.canvas && reading.number === target) {
+          const wrap = document.getElementById('pg' + (target - 1));
+          if (wrap && !wrap.dataset.rendered) {
+            reading.canvas.className = 'openingPreview openingReadCarry';
+            wrap.querySelector('canvas')?.after(reading.canvas);
+          }
+        } else if (openingPage && first.pages[0] === openingPage) showOpeningPreview(openingPage, openingRaster);
       }
       if (restored) toast('✏️ 이 편집기로 저장한 파일 — 오브젝트를 이어서 편집할 수 있습니다');
       else if (opened > 1) toast(opened + '개 문서를 각각 탭으로 열었습니다');
@@ -1923,7 +1939,7 @@ async function openFiles(files, append) {
   } catch (e) {
     console.error(e);
     toast('열기 실패: ' + (e.message || e).toString().slice(0, 80), 4000);
-  } finally { spin(false); }
+  } finally { openingReader?.finish(); spin(false); }
 }
 
 function setButtons(on) {
@@ -2357,6 +2373,37 @@ const rasterOutput = createRasterOutputFeature({
   createCanvas: () => document.createElement('canvas'),
 });
 let printPreparing = false, rasterPreparing = false;
+let activeImageJob = null;
+
+async function runImageJob(work) {
+  if (activeImageJob || printPreparing) throw new Error('다른 출력 작업이 진행 중입니다');
+  const controller = new AbortController(), button = $('rasterCancel');
+  const job = { controller, done: null };
+  activeImageJob = job;
+  const cancel = () => controller.abort();
+  const onKey = event => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault(); event.stopImmediatePropagation(); cancel();
+  };
+  const onAbort = () => {
+    button.disabled = true;
+    spin(true, '내보내기 취소 중…');
+    displayPainter.shutdown();
+  };
+  button.hidden = false; button.disabled = false;
+  button.addEventListener('click', cancel);
+  window.addEventListener('keydown', onKey, true);
+  controller.signal.addEventListener('abort', onAbort, { once: true });
+  try {
+    job.done = Promise.resolve().then(() => work(controller.signal));
+    return await job.done;
+  } finally {
+    activeImageJob = null; button.hidden = true;
+    button.removeEventListener('click', cancel);
+    window.removeEventListener('keydown', onKey, true);
+    controller.signal.removeEventListener('abort', onAbort);
+  }
+}
 const parallelPrint = createParallelPrintFeature({
   pdfLib: pdfLib.raw, pdfiumCdn: pdfiumBase,
   getWasmBinary: () => pdfiumAdapter.getWasmBinary(),
@@ -6742,10 +6789,29 @@ document.addEventListener('mousedown', e => {
 }, true);
 
 const libDocCache = new Map();
+const originalDesktopFiles = new WeakMap();
+
+function overlayState(pages) {
+  return JSON.stringify(pages.map(page => page.texts), (key, value) => key === '_id' ? undefined : value);
+}
+
+function rememberDesktopFile(doc, source, bytes) {
+  if (desktopViewMode && !source.locked && doc.pages.length) {
+    originalDesktopFiles.set(doc, { source, bytes, overlays: overlayState(doc.pages) });
+  }
+}
+
+function unchangedDesktopBytes(doc) {
+  const opened = originalDesktopFiles.get(doc);
+  if (!opened || doc.dirty || !doc.pages.length || doc.pages.length !== opened.source.doc.numPages) return null;
+  if (!doc.pages.every((p, i) => sources.get(p.src) === opened.source && p.idx === i &&
+      !p.rot && !p.blank && !p.crop && !p.resize)) return null;
+  return opened.overlays === overlayState(doc.pages) ? opened.bytes : null;
+}
 async function getLibDoc(srcId) {
   if (!libDocCache.has(srcId)) {
     const s = sources.get(srcId);
-    libDocCache.set(srcId, await PDFDocument.load(s.bytes, { ignoreEncryption: true }));
+    libDocCache.set(srcId, await PDFDocument.load(s.bytes, { ignoreEncryption: true, parseSpeed: 1500 }));
   }
   return libDocCache.get(srcId);
 }
@@ -6808,6 +6874,22 @@ async function tryOpenProject(f, pdoc) {
   } catch (e) { console.warn('프로젝트 복원 실패', e); return null; }
 }
 
+async function restoreMarkedInWorker(bytes, pages) {
+  let worker;
+  try {
+    worker = new Worker('/assets/editor-tools/marked-recovery.js');
+    const result = await new Promise((resolve, reject) => {
+      worker.onmessage = ({data}) => resolve(data);
+      worker.onerror = worker.onmessageerror = reject;
+      const copy = bytes.slice();
+      worker.postMessage({bytes: copy, pages, fonts: Object.keys(FONTS)}, [copy.buffer]);
+    });
+    if (result) return result;
+  } catch {
+  } finally { worker?.terminate(); }
+  return prepareMarkedRestoration(bytes, pdfLib.raw, sanitizeTextObj, {expectedPages: pages});
+}
+
 async function tryOpenMarked(f, pdoc, bytes) {
   try {
     const md = await pdoc.getMetadata().catch(() => null);
@@ -6816,7 +6898,9 @@ async function tryOpenMarked(f, pdoc, bytes) {
     if ((keywords.match(/pc:[^\s,;]+\./g) || []).some(key => !FONTS[key])) return null;
   } catch { return null; }
   try {
-    const {candidates, restored} = await prepareMarkedRestoration(bytes, pdfLib.raw, sanitizeTextObj, { expectedPages: pdoc.numPages });
+    const {candidates, restored} = desktopViewMode && bytes.length >= 2 * 1024 * 1024
+      ? await restoreMarkedInWorker(bytes, pdoc.numPages)
+      : await prepareMarkedRestoration(bytes, pdfLib.raw, sanitizeTextObj, {expectedPages: pdoc.numPages});
     if (candidates && !candidates.size) return null;
     const pageTexts = restored?.pageTexts || [];
     const cleanBytes = restored?.bytes || await withPdfiumDoc(bytes, async (F, M, doc) => {
@@ -6893,10 +6977,12 @@ async function tryOpenMarked(f, pdoc, bytes) {
     const d = newDoc(f.name.replace(/\.pdf$/i, ''));
     d.fileHandle = f._handle || null;
     const id = ++srcSeq;
-    sources.set(id, { bytes: cleanBytes, doc: pd, name: f.name });
+    const source = { bytes: cleanBytes, doc: pd, name: f.name, locked: await detectPdfLocked(pdoc) };
+    sources.set(id, source);
     d.srcIds.push(id);
     for (let i = 0; i < pd.numPages; i++)
       d.pages.push({ src: id, idx: i, rot: 0, texts: pageTexts[i] || [] });
+    if (restored) rememberDesktopFile(d, source, bytes);
     try { pdoc.destroy(); } catch {}
     return d;
   } catch (e) { console.warn('이름표 복원 실패', e); return null; }
@@ -7376,7 +7462,7 @@ async function buildPdf(pageList, printTitle) {
     const pcKeys = new Set(pageList.flatMap(p => p.texts.map(t => t.font).filter(key => key?.startsWith('pc:'))));
     out.setKeywords(['sol-marked', ...pcKeys]);
   }  
-  return out.save();
+  return out.save({objectsPerTick: 1500});
 }
 
 function download(bytes, name) {
@@ -7385,11 +7471,20 @@ function download(bytes, name) {
 
 const FS_OK = browserFiles.supportsFileSystemAccess;
 async function saveDesktop(forceSaveAs = false, { onComplete = null } = {}) {
+  if (activeImageJob) {
+    const job = activeImageJob;
+    if (job.saving) { onComplete?.(false); return; }
+    job.saving = true;
+    job.controller.abort();
+    await job.done.catch(() => {});
+  }
   if (!editorStore.pages.length || desktopSaveTransfers.size) { onComplete?.(false); return; }
   if (activeDocLocked()) { lockNotice(); onComplete?.(false); return; }
   spin(true, 'PDF 저장 중...');
   try {
-    const bytes = await buildPdf(editorStore.pages);
+    const editing = pendingObjectEdits();
+    if (editing) await editing;
+    const bytes = unchangedDesktopBytes(editorStore.activeDocument) ?? await buildPdf(editorStore.pages);
     const requestId = crypto.randomUUID ? crypto.randomUUID() :
       Date.now().toString(36) + Math.random().toString(36).slice(2);
     const name = (editorStore.documentName || '문서').replace(/\.pdf$/i, '') + '.pdf';
@@ -7571,47 +7666,64 @@ $('prOk').onclick = async () => {
       const orientation = orient === 'auto' ? (firstViewport.width > firstViewport.height ? 'landscape' : 'portrait') : orient;
       const fitWithin = printPaperSize(paper, orientation);
       if (!mediaRuns.length && fitWithin) mediaRuns.push({ first: 1, last: list.length, width: fitWithin[0], height: fitWithin[1] });
-      let bytes;
       const raster = mode === 'image' || monochromePdf;
-      if (raster) {
-        const onProgress = (done, total) => spin(true, preparing + ' · ' + done + ' / ' + total);
-        let workerCompatible = typeof Worker === 'function' && typeof OffscreenCanvas === 'function';
-        for (const sourceId of new Set(list.filter(p => !p.blank).map(p => p.src))) {
-          const source = sources.get(sourceId);
-          if (source.locked || source.doc.isPureXfa || await source.doc.getFieldObjects()) workerCompatible = false;
+      const duplex = $('prDuplex').value, color = $('prColor').value, printer = $('prPrinter').value;
+      const whole = { first: 1, last: list.length, copy: 0 };
+      const readyPdf = !raster && originalPrintBytes(list, id => sources.get(id));
+      const pipeline = !pdfPrinter && list.length > 1 && !readyPdf;
+      const firstSheet = mediaRuns.find(run => run.width !== run.height);
+      const feedLandscape = firstSheet ? firstSheet.width > firstSheet.height : false;
+      const batches = pipeline ? printBatches(orient === 'auto' ? printFeedRuns(mediaRuns) : mediaRuns, duplex, copies) : [whole];
+      async function prepare({ first, last }, signal) {
+        const pages = first === 1 && last === list.length ? list : list.slice(first - 1, last);
+        const sizes = pageSizes.slice(first - 1, last);
+        let runs = mediaRuns.filter(run => run.first <= last && run.last >= first).map(run => ({
+          ...run, first: Math.max(run.first, first) - first + 1, last: Math.min(run.last, last) - first + 1,
+        }));
+        let bytes;
+        const onProgress = done => {
+          if (!signal.aborted) spin(true, preparing + ' · ' + (first - 1 + done) + ' / ' + list.length);
+        };
+        if (raster) {
+          let workerCompatible = typeof Worker === 'function' && typeof OffscreenCanvas === 'function';
+          for (const sourceId of new Set(pages.filter(p => !p.blank).map(p => p.src))) {
+            const source = sources.get(sourceId);
+            if (source.locked || source.doc.isPureXfa || await source.doc.getFieldObjects()) workerCompatible = false;
+          }
+          if (workerCompatible) {
+            const prepared = await buildPrintPdf(pages);
+            const result = await parallelPrint.buildPdf(prepared, sizes, {
+              fitWithin, autoRotateFit: orient === 'auto', name, monochrome: monochromePdf, onProgress, signal: signal,
+            });
+            bytes = result.bytes;
+            console.info('[DaydayPDF print]', JSON.stringify(result.stats));
+          } else {
+            ({ bytes } = await rasterOutput.buildPdf(pages, {
+              scale: 300 / 72, type: 'image/jpeg', quality: .9, fitWithin, autoRotateFit: orient === 'auto', signal: signal, name,
+              maxEdge: 6000, maxPixels: 16000000,
+              transformCanvas: monochromePdf ? grayscaleCanvas : null,
+              onProgress: (done, total) => { if (signal.aborted) throw new DOMException('인쇄 준비를 취소했습니다.', 'AbortError'); onProgress(done, total); },
+            }));
+          }
+        } else bytes = await buildPrintPdf(pages, pdfPrinter ? null : name);
+        if (signal.aborted) throw new DOMException('인쇄 준비를 취소했습니다.', 'AbortError');
+        if (pdfPrinter && !(raster && paper === 'auto' && copies === 1))
+          bytes = await makePdfPrintCopy(PDFLib, bytes, { copies, orientation: orient, paper, signal: signal, name, flattenAnnotations: flattenPrintAnnotations });
+        signal.throwIfAborted();
+        if (!pdfPrinter && orient === 'auto') {
+          ({ bytes, mediaRuns: runs } = await alignPrinterMedia(PDFLib, bytes, runs, signal, feedLandscape));
+          signal.throwIfAborted();
         }
-        if (workerCompatible) {
-          const prepared = await buildPrintPdf(list);
-          const result = await parallelPrint.buildPdf(prepared, pageSizes, {
-            fitWithin, autoRotateFit: orient === 'auto', name, monochrome: monochromePdf, onProgress, signal: abort.signal,
-          });
-          bytes = result.bytes;
-          console.info('[DaydayPDF print]', JSON.stringify(result.stats));
-        } else {
-          ({ bytes } = await rasterOutput.buildPdf(list, {
-            scale: 300 / 72, type: 'image/jpeg', quality: .9, fitWithin, autoRotateFit: orient === 'auto', signal: abort.signal, name,
-            maxEdge: 6000, maxPixels: 16000000,
-            transformCanvas: monochromePdf ? grayscaleCanvas : null,
-            onProgress: (done, total) => { if (abort.signal.aborted) throw new DOMException('인쇄 준비를 취소했습니다.', 'AbortError'); onProgress(done, total); },
-          }));
-        }
-      } else bytes = await buildPrintPdf(list, pdfPrinter ? null : name);
-      if (abort.signal.aborted) throw new DOMException('인쇄 준비를 취소했습니다.', 'AbortError');
-      if (pdfPrinter && !(raster && paper === 'auto' && copies === 1))
-        bytes = await makePdfPrintCopy(PDFLib, bytes, { copies, orientation: orient, paper, signal: abort.signal, name, flattenAnnotations: flattenPrintAnnotations });
-      abort.signal.throwIfAborted();
-      if (!pdfPrinter && orient === 'auto') {
-        ({ bytes, mediaRuns } = await alignPrinterMedia(PDFLib, bytes, mediaRuns, abort.signal));
-        abort.signal.throwIfAborted();
+        return { bytes, runs };
       }
-      const result = await desktopOutput.print(bytes, {
-        printer: $('prPrinter').value, copies: pdfPrinter ? 1 : copies, name,
-        color: $('prColor').value, duplex: $('prDuplex').value, mediaRuns, pageCount: list.length, paper,
-      }, { signal: abort.signal, onProgress: status => {
-        if (abort.signal.aborted) return;
-        canCancel = status.canCancel;
-        spin(true, uiText(status.message));
-      } });
+      const result = await submitPrintBatches(batches, prepare, ({ bytes, runs }, batch, signal) => desktopOutput.print(bytes, {
+        printer, copies: pdfPrinter || pipeline ? 1 : copies, name, color, duplex,
+        mediaRuns: runs, pageCount: batch.last - batch.first + 1, paper,
+      }, { signal, onProgress: status => {
+        if (signal.aborted) return;
+        canCancel = pipeline || status.canCancel;
+        spin(true, uiText(status.message) + (pipeline ? ' · ' + batch.first + '–' + batch.last + ' / ' + list.length : ''));
+      } }), abort.signal);
       if (result.canceled) { toast(result.submitted ? '남은 인쇄를 취소했습니다. 전송된 작업은 대기열에서 확인하세요.' : '인쇄를 취소했습니다.'); return; }
       if (result.ok) toast(result.openedPdf ? '인쇄한 PDF를 새 탭으로 열었습니다.' : result.savedPdf ? 'PDF를 저장했습니다.' : '프린터로 보냈습니다.');
       return;
@@ -7775,16 +7887,27 @@ async function commitDesktopObjectClipboard(object, cut, sourceDocument, markerW
   });
 }
 
-function putShellClipboard(packet, meta) {
+function putShellClipboard(packet, meta, signal) {
+  signal?.throwIfAborted();
   const requestId = crypto.randomUUID ? crypto.randomUUID() :
     Date.now().toString(36) + Math.random().toString(36).slice(2);
   return new Promise((resolve, reject) => {
-    desktopClipboardPuts.set(requestId, { packet, resolve, reject });
+    const cancel = () => {
+      desktopClipboardPuts.delete(requestId);
+      desktopHost.send({ type: 'clipboard-put-cancel', apiVersion: 4, requestId });
+      reject(signal.reason);
+    };
+    signal?.addEventListener('abort', cancel, { once: true });
+    desktopClipboardPuts.set(requestId, { packet,
+      resolve: value => { signal?.removeEventListener('abort', cancel); resolve(value); },
+      reject: error => { signal?.removeEventListener('abort', cancel); reject(error); },
+    });
     if (!desktopHost.send({
       type: 'clipboard-put', apiVersion: 4, requestId,
       size: packet.byteLength, meta,
     })) {
       desktopClipboardPuts.delete(requestId);
+      signal?.removeEventListener('abort', cancel);
       reject(new Error('Windows 클립보드 채널을 사용할 수 없습니다'));
     }
   });
@@ -8763,7 +8886,11 @@ function openExportDialog() {
   $('exCount').textContent = '— ' + editorStore.selectedPages.size + '개 페이지';
   $('exOverlay').classList.add('show');
 }
-async function exportSelectedPages(fmt) {
+async function exportSelectedPages(fmt, signal) {
+  if (fmt === 'img' && !signal) {
+    if (activeImageJob || printPreparing) return;
+    return runImageJob(signal => exportSelectedPages(fmt, signal));
+  }
   if (fmt !== 'img' && fmt !== 'pdf') return;
   const idxs = [...editorStore.selectedPages].sort((a, b) => a - b);
   if (!idxs.length) { $('exOverlay').classList.remove('show'); return; }
@@ -8775,7 +8902,7 @@ async function exportSelectedPages(fmt) {
       let packet;
       if (fmt === 'img') {
         const targetDoc = editorStore.activeDocument, targetPages = editorStore.pages;
-        const rs = await makeRasterSource(idxs, { openDocument: false });
+        const rs = await makeRasterSource(idxs, { openDocument: false, signal });
         if (editorStore.activeDocument !== targetDoc || editorStore.pages !== targetPages) {
           throw new Error('작업 중 문서가 변경되어 결과를 적용하지 않았습니다');
         }
@@ -8788,12 +8915,13 @@ async function exportSelectedPages(fmt) {
       } else {
         packet = await serializePageListForClipboard(idxs.map(index => editorStore.pages[index]));
       }
-      await syncClipMarker(CLIP_PAGES);
+      signal?.throwIfAborted();
       await putShellClipboard(packet, {
         kind: 'pages-v1', count: idxs.length, operation: 'copy',
         purpose: 'open-native-document', sourceTab: desktopTabToken,
         sourceDocument: editorStore.documentName,
-      });
+      }, signal);
+      signal?.throwIfAborted();
       if (del) {
         if (idxs.length >= editorStore.pages.length) {
           toast('모든 페이지를 삭제할 수는 없어 삭제는 생략했습니다', 3000);
@@ -8811,6 +8939,7 @@ async function exportSelectedPages(fmt) {
       });
       scheduleSrcSweep();
     } catch (error) {
+      if (signal?.aborted) { toast('내보내기를 취소했습니다'); return; }
       console.error(error);
       toast('새 탭 준비 실패: ' + String(error?.message || error).slice(0, 80), 4200);
     } finally { spin(false); }
@@ -8821,7 +8950,7 @@ async function exportSelectedPages(fmt) {
     const targetDoc = editorStore.activeDocument, targetPages = editorStore.pages;
     spin(true, '이미지 형식으로 내보내는 중...');
     try {
-      const rs = await makeRasterSource(idxs);
+      const rs = await makeRasterSource(idxs, { signal });
       if (editorStore.activeDocument !== targetDoc || editorStore.pages !== targetPages) {
         try { rs.doc.destroy(); } catch {}
         throw new Error('작업 중 문서가 변경되어 결과를 적용하지 않았습니다');
@@ -8834,6 +8963,7 @@ async function exportSelectedPages(fmt) {
       markChanged(newTab);
       editorStore.documents.push(newTab);
     } catch (e) {
+      if (signal.aborted) { toast('내보내기를 취소했습니다'); return; }
       console.error(e);
       toast('내보내기 실패: ' + (e.message || e).toString().slice(0, 60), 3500);
       return;
@@ -9973,45 +10103,47 @@ async function withImageDuplicatePage(page, paint) {
   return withRegionSource(bytes, src => paint({ src, idx:0, rot:0, texts:[] }));
 }
 
-async function makeRasterSource(idxs, { openDocument = true } = {}) {
+async function makeRasterSource(idxs, { openDocument = true, signal } = {}) {
+  if (!signal) return runImageJob(signal => makeRasterSource(idxs, { openDocument, signal }));
+  signal.throwIfAborted();
   const editing = pendingObjectEdits();
   if (editing) await editing;
   if (rasterPreparing || printPreparing) throw new Error('다른 출력 작업이 진행 중입니다');
   rasterPreparing = true;
   clearTimeout(thumbPrepassT); thumbnailWorkerController.shutdown();
-  const abort = new AbortController();
-  const cancel = event => { if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation();
-    abort.abort(); displayPainter.shutdown(); } };
-  window.addEventListener('keydown', cancel, true);
   try {
+    signal.throwIfAborted();
     const [dupSc, dupMime, dupQ] = ($('setDupQ').value || DEFAULT_DUP_Q).split('|');
     const requestedScale = Math.max(1, +dupSc || 4.1667);
     const list = idxs.map(index => clonePage(editorStore.pages[index]));
     const { bytes, limited } = await rasterOutput.buildPdf(list, {
-      scale: requestedScale, type: dupMime, quality: +dupQ, signal: abort.signal,
+      scale: requestedScale, type: dupMime, quality: +dupQ, signal,
       supersample: true, withPage: withImageDuplicatePage,
       onProgress: (done, total) => spin(true, uiText('이미지 형식으로 내보내는 중...') + ' ' + done + ' / ' + total),
     });
-    if (abort.signal.aborted) throw new DOMException('이미지 변환을 취소했습니다.', 'AbortError');
+    signal.throwIfAborted();
     const doc = openDocument ? await openPdfDocument(bytes.slice()).promise : null;
-    if (abort.signal.aborted) { await doc?.destroy(); throw new DOMException('이미지 변환을 취소했습니다.', 'AbortError'); }
+    if (signal.aborted) { await doc?.destroy(); signal.throwIfAborted(); }
     return { bytes, doc, limited,
       qualityLabel: Math.round(requestedScale * 72) + ' DPI ' + (dupMime === 'image/png' ? 'PNG' : 'JPG') };
   } finally {
-    window.removeEventListener('keydown', cancel, true);
     displayPainter.shutdown(); outputOverlayRenderer.clearImageCache(); rasterPreparing = false;
     scheduleThumbPrepass();
     viewer.querySelectorAll('.pageWrap').forEach(wrap => enqueueRender(wrap));
   }
 }
 
-async function duplicateAsImage(idxs) {
+async function duplicateAsImage(idxs, signal) {
   if (!idxs.length) return;
+  if (!signal) {
+    if (activeImageJob || printPreparing) return;
+    return runImageJob(signal => duplicateAsImage(idxs, signal));
+  }
   spin(true, '이미지 형식으로 복제 중...');
   try {
     const targetDoc = editorStore.activeDocument, targetPages = editorStore.pages;
     const snap = makeSnap();
-    const rs = await makeRasterSource(idxs);
+    const rs = await makeRasterSource(idxs, { signal });
     if (editorStore.activeDocument !== targetDoc || editorStore.pages !== targetPages) {
       try { rs.doc.destroy(); } catch {}
       throw new Error('작업 중 문서가 변경되어 결과를 적용하지 않았습니다');
@@ -10025,7 +10157,8 @@ async function duplicateAsImage(idxs) {
     rebuildAll();
     toast(rs.limited ? '이미지 형식으로 복제됨 — 대형 페이지는 브라우저 한도에 맞춰 해상도를 조정했습니다' :
                        '이미지 형식으로 복제됨 — ' + rs.qualityLabel);
-  } catch (e) { console.error(e); toast('이미지 형식 복제 실패: ' + (e.message || e).toString().slice(0, 60), 3000); }
+  } catch (e) { if (signal.aborted) { toast('이미지 복제를 취소했습니다'); return; }
+    console.error(e); toast('이미지 형식 복제 실패: ' + (e.message || e).toString().slice(0, 60), 3000); }
   finally { spin(false); }
 }
 

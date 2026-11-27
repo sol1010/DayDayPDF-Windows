@@ -21,16 +21,71 @@ export function addPrintMediaRun(runs, first, width, height, last = first) {
   } else runs.push({ first, last, width, height });
 }
 
-export async function alignPrinterMedia(pdfLib, bytes, runs, signal) {
+export const printBatches = function* (runs, duplex, copies) {
+  const firstSize = duplex === 'long' || duplex === 'short' ? 2 : 1;
+  for (let copy = 0; copy < copies; copy++) {
+    for (const run of runs) {
+      for (let first = run.first; first <= run.last;) {
+        const size = first === 1 && copy === 0 ? firstSize : 8;
+        const last = Math.min(run.last, first + size - 1);
+        yield { first, last, copy };
+        first = last + 1;
+      }
+    }
+  }
+};
+
+export async function submitPrintBatches(batches, prepare, send, signal) {
+  const controller = new AbortController();
+  const combined = AbortSignal.any([signal, controller.signal]);
+  let pending, last, submitted = false;
+  try {
+    for (const batch of batches) {
+      combined.throwIfAborted();
+      const packet = await prepare(batch, combined);
+      if (pending) await pending;
+      combined.throwIfAborted();
+      pending = Promise.resolve(send(packet, batch, combined)).then(result => {
+        last = result;
+        if (result.canceled) {
+          submitted ||= !!result.submitted;
+          throw new DOMException('인쇄를 취소했습니다.', 'AbortError');
+        }
+        if (!result.ok) throw new Error('프린터 전송에 실패했습니다.');
+        submitted = true;
+      });
+      pending.catch(error => controller.abort(error));
+    }
+    await pending;
+    return last;
+  } catch (error) {
+    if (pending) await pending.catch(() => {});
+    const failure = controller.signal.reason || error;
+    if (failure.name === 'AbortError') return { canceled: true, submitted };
+    if (submitted) throw new Error('앞쪽은 이미 전송됐습니다. 대기열을 확인하세요. ' + failure.message, { cause: failure });
+    throw failure;
+  }
+}
+
+function stockDimensions(width, height) {
+  const short = Math.min(width, height), long = Math.max(width, height);
+  return Object.values(printPaperSizes).find(([w, h]) => Math.abs(w - short) <= .5 && Math.abs(h - long) <= .5) || [short, long];
+}
+
+export function printFeedRuns(runs) {
+  const result = [];
+  for (const run of runs) addPrintMediaRun(result, run.first, ...stockDimensions(run.width, run.height), run.last);
+  return result;
+}
+
+export async function alignPrinterMedia(pdfLib, bytes, runs, signal, landscape) {
   const firstSheet = runs.find(run => run.width !== run.height);
-  const feedLandscape = firstSheet ? firstSheet.width > firstSheet.height : false;
+  const feedLandscape = landscape ?? (firstSheet ? firstSheet.width > firstSheet.height : false);
   const mediaRuns = [];
   let pdf;
   for (const { first, last, width, height } of runs) {
     signal?.throwIfAborted();
-    const short = Math.min(width, height), long = Math.max(width, height);
-    const stock = Object.values(printPaperSizes).find(([w, h]) =>
-      Math.abs(w - short) <= .5 && Math.abs(h - long) <= .5) || [short, long];
+    const stock = stockDimensions(width, height);
     addPrintMediaRun(mediaRuns, first, stock[feedLandscape ? 1 : 0], stock[feedLandscape ? 0 : 1], last);
     if (width === height || (width > height) === feedLandscape) continue;
     pdf ??= await pdfLib.PDFDocument.load(bytes, { updateMetadata: false });
