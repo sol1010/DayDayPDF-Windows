@@ -102,7 +102,7 @@ function slidePlacement(imageWidth, imageHeight, slideWidth, slideHeight) {
 export function createPptx(pages, { title = 'OCR presentation' } = {}) {
   const sourcePages = normalizedPages(pages);
   if (!sourcePages.length || sourcePages.some(page => !page.image?.bytes)) {
-    throw new TypeError('PowerPoint 변환에는 모든 페이지 이미지가 필요합니다');
+    throw new TypeError('PPTX 변환에는 모든 페이지 이미지가 필요합니다');
   }
   const slideWidth = 12192000;
   const slideHeight = 6858000;

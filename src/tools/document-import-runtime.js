@@ -36,7 +36,7 @@ export function resolveDocumentPart(base, target) {
   return parts.join('/');
 }
 
-export function parseOfficeDocument(bytes, name, { DOMParserClass = globalThis.DOMParser } = {}) {
+export function parseSourceDocument(bytes, name, { DOMParserClass = globalThis.DOMParser } = {}) {
   const extension = String(name).toLowerCase().match(/\.[^.]+$/)?.[0];
   if (!DOCUMENT_INPUTS.includes(extension)) throw new Error('DOCX·XLSX·PPTX·HWPX만 지원합니다. HWP·DOC·XLS·PPT는 새 문서 형식으로 저장한 뒤 선택하세요.');
   const files = openDocumentPackage(bytes);
@@ -119,10 +119,10 @@ export function parseOfficeDocument(bytes, name, { DOMParserClass = globalThis.D
         for (const p of all(node, 'p')) addParagraph(p);
       }
     }
-    if (all(doc, 'altChunk').length) throw new Error('외부 본문이 삽입된 Word 문서는 지원하지 않습니다. Word에서 DOCX로 다시 저장하세요.');
+    if (all(doc, 'altChunk').length) throw new Error('외부 본문이 삽입된 DOCX 문서는 지원하지 않습니다. 외부 본문을 문서에 포함한 뒤 DOCX로 다시 저장하세요.');
     if (all(doc, 'sectPr').length > 1 || all(doc, 'headerReference').length || all(doc, 'footerReference').length || all(doc, 'numPr').length) warn('구역별 서식·머리말·꼬리말·자동 번호는 원본과 다를 수 있습니다.');
     if (!plain(doc).trim() && !blocks.some(b => b.kind === 'image')) throw new Error('변환할 본문이 없습니다.');
-    model.sections.push({ name: 'Word', width: number(pageSize, 'w', 11906) / 20, height: number(pageSize, 'h', 16838) / 20,
+    model.sections.push({ name: 'DOCX', width: number(pageSize, 'w', 11906) / 20, height: number(pageSize, 'h', 16838) / 20,
       margin: Math.min(100, Math.max(24, number(margins, 'left', 1000) / 20)), blocks });
   }
 
@@ -153,7 +153,7 @@ export function parseOfficeDocument(bytes, name, { DOMParserClass = globalThis.D
           const position = parseCellAddress(attr(cell, 'r'));
           if (!position || position.col > 199) throw new Error('200열을 넘는 시트는 지원하지 않습니다.');
           const valueNode = first(cell, 'v');
-          if (first(cell, 'f') && (!valueNode || text(valueNode) === '' && attr(cell, 't') !== 'str')) throw new Error('계산 결과가 저장되지 않은 수식이 있습니다. Excel에서 계산 후 저장한 파일을 선택하세요.');
+          if (first(cell, 'f') && (!valueNode || text(valueNode) === '' && attr(cell, 't') !== 'str')) throw new Error('계산 결과가 저장되지 않은 수식이 있습니다. 수식을 계산한 뒤 저장한 파일을 선택하세요.');
           const type = attr(cell, 't');
           const value = text(valueNode);
           const style = xfs[number(cell, 's')];
@@ -178,7 +178,7 @@ export function parseOfficeDocument(bytes, name, { DOMParserClass = globalThis.D
       const merges = all(doc, 'mergeCell').map(m => attr(m, 'ref').split(':').map(parseCellAddress));
       for (const [start, end] of merges) {
         if (!start || !end) continue;
-        if (start.row !== end.row) warn('Excel의 세로 병합 셀은 첫 번째 행에 표시합니다.');
+        if (start.row !== end.row) warn('XLSX의 세로 병합 셀은 첫 번째 행에 표시합니다.');
         const entry = entries.find(row => row.index === start.row);
         if (entry?.cells[start.col]) entry.cells[start.col].span = Math.min(maxCol, end.col) - start.col + 1;
       }
@@ -197,8 +197,8 @@ export function parseOfficeDocument(bytes, name, { DOMParserClass = globalThis.D
         }
         return row;
       });
-      if (all(doc, 'drawing').length || all(doc, 'legacyDrawing').length) warn('Excel의 차트·그림·도형은 포함되지 않습니다. 셀 내용과 표를 변환합니다.');
-      if (all(doc, 'f').length) warn('Excel 수식은 파일에 저장된 계산 결과를 사용하며 다시 계산하지 않습니다.');
+      if (all(doc, 'drawing').length || all(doc, 'legacyDrawing').length) warn('XLSX의 차트·그림·도형은 포함되지 않습니다. 셀 내용과 표를 변환합니다.');
+      if (all(doc, 'f').length) warn('XLSX 수식은 파일에 저장된 계산 결과를 사용하며 다시 계산하지 않습니다.');
       model.sections.push({ name, width: visible.length > 6 ? 842 : 595, height: visible.length > 6 ? 595 : 842, margin: 30,
         blocks: [{ kind: 'text', text: name, size: 14 }, { kind: 'table', widths: visible.map(i => widths[i]), rows }] });
     }
@@ -219,9 +219,9 @@ export function parseOfficeDocument(bytes, name, { DOMParserClass = globalThis.D
       const background = hex(attr(first(first(doc, 'bg'), 'srgbClr'), 'val'));
       for (const shape of [...first(doc, 'spTree')?.children || []]) {
         if (['nvGrpSpPr', 'grpSpPr'].includes(shape.localName)) continue;
-        if (shape.localName === 'grpSp') { warn('PPT의 그룹 도형은 지원하지 않습니다. 그룹을 해제한 파일로 변환하세요.'); continue; }
+        if (shape.localName === 'grpSp') { warn('PPTX의 그룹 도형은 지원하지 않습니다. 그룹을 해제한 파일로 변환하세요.'); continue; }
         const transform = first(shape, 'xfrm');
-        if (!transform) { warn('마스터에 배치된 PPT 요소는 일부 표시되지 않습니다.'); continue; }
+        if (!transform) { warn('마스터에 배치된 PPTX 요소는 일부 표시되지 않습니다.'); continue; }
         const offset = first(transform, 'off');
         const extent = first(transform, 'ext');
         const box = { x: number(offset, 'x') / 12700, y: number(offset, 'y') / 12700,
@@ -230,7 +230,7 @@ export function parseOfficeDocument(bytes, name, { DOMParserClass = globalThis.D
         if (shape.localName === 'pic') {
           const picture = image(links.get(attr(first(shape, 'blip'), 'embed')), box);
           if (picture) blocks.push(picture);
-          if (first(shape, 'srcRect')) warn('PPT 그림 자르기와 회전은 원본과 다를 수 있습니다.');
+          if (first(shape, 'srcRect')) warn('PPTX 그림 자르기와 회전은 원본과 다를 수 있습니다.');
         } else if (shape.localName === 'sp') {
           const props = children(shape, 'spPr')[0];
           const fill = hex(attr(first(children(props, 'solidFill')[0], 'srgbClr'), 'val'));
@@ -244,8 +244,8 @@ export function parseOfficeDocument(bytes, name, { DOMParserClass = globalThis.D
               color: hex(attr(first(r, 'srgbClr'), 'val')), align: ({ ctr: 'center', r: 'right' })[attr(first(p, 'pPr'), 'algn')] || 'left' });
             y += size * 1.4 * Math.max(1, Math.ceil(value.length * size * .6 / Math.max(10, box.width - 10)));
           }
-        } else warn('PPT의 표·차트·SmartArt는 지원하지 않습니다.');
-        if (number(transform, 'rot')) warn('회전한 PPT 요소의 배치는 원본과 다를 수 있습니다.');
+        } else warn('PPTX의 표·차트·다이어그램은 지원하지 않습니다.');
+        if (number(transform, 'rot')) warn('회전한 PPTX 요소의 배치는 원본과 다를 수 있습니다.');
       }
       model.sections.push({ name: `Slide ${++index}`, width, height, margin: 0, fixed: true, background, blocks });
     }
@@ -256,7 +256,7 @@ export function parseOfficeDocument(bytes, name, { DOMParserClass = globalThis.D
     const manifest = new Map(all(first(content, 'manifest'), 'item').map(n => [attr(n, 'id'), attr(n, 'href')]));
     const resolveHwpx = href => files[href] ? href : resolveDocumentPart('Contents/content.hpf', href);
     const sections = all(first(content, 'spine'), 'itemref').map(n => resolveHwpx(manifest.get(attr(n, 'idref')))).filter(p => /section[^/]*\.xml$/i.test(p || ''));
-    if (!sections.length) throw new Error('한글 문서의 본문 순서 정보를 찾지 못했습니다.');
+    if (!sections.length) throw new Error('HWPX 문서의 본문 순서 정보를 찾지 못했습니다.');
     for (const part of sections) {
       const doc = xml(part);
       const page = first(doc, 'pagePr');

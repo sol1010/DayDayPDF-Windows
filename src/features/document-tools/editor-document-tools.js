@@ -60,9 +60,9 @@ export function createEditorDocumentTools({ getCurrentFile, withDocument, hasCur
       <span class="documentFileName" data-pdf-name data-i18n-ignore translate="no"></span>
     </div>
     <div class="row"><label for="documentOutput">작업</label><select id="documentOutput">
-      <option value="pdf">OCR · 검색 가능한 PDF</option><option value="editable-pdf">OCR · 검색 및 편집 가능한 PDF</option><option value="pptx">PDF → PPT</option>
-      <option value="docx">PDF → Word</option><option value="xlsx">PDF → Excel</option>
-      <option value="hwp">PDF → 한글(HWP)</option><option value="png">PDF → PNG 이미지</option>
+      <option value="pdf">OCR · 검색 가능한 PDF</option><option value="editable-pdf">OCR · 검색 및 편집 가능한 PDF</option><option value="pptx">PDF → PPTX</option>
+      <option value="docx">PDF → DOCX</option><option value="xlsx">PDF → XLSX</option>
+      <option value="hwp">PDF → HWP</option><option value="png">PDF → PNG 이미지</option>
       <option value="jpg">PDF → JPG 이미지</option><option value="import">문서 → PDF</option></select></div>
     <p class="documentToolsNote" data-description></p>
     <div class="documentFilePicker" data-import hidden>
@@ -95,7 +95,7 @@ export function createEditorDocumentTools({ getCurrentFile, withDocument, hasCur
     pdf: '현재 편집 내용을 포함해 문자 인식을 실행합니다. 스캔 이미지의 모양을 유지하며 검색용 텍스트를 추가합니다.',
     'editable-pdf': '인식한 글자를 원본 편집에서 더블클릭해 수정할 수 있습니다.',
     pptx: '페이지 모양을 유지해 이미지로 슬라이드에 배치하고, 인식한 텍스트를 별도 개체로 포함합니다.',
-    docx: '인식한 텍스트를 Word 문서에 저장합니다. 원본의 이미지와 문단 배치는 유지되지 않습니다.',
+    docx: '인식한 텍스트를 DOCX 문서에 저장합니다. 원본의 이미지와 문단 배치는 유지되지 않습니다.',
     xlsx: '인식한 텍스트를 페이지별 시트에 저장합니다. 이미지·표 서식·수식은 자동 복원되지 않습니다.',
     hwp: '각 페이지를 이미지로 배치한 HWP 파일을 만듭니다. HWP 안에서 글자를 직접 수정할 수 없습니다.',
     png: '현재 편집 내용을 포함해 페이지를 PNG 이미지로 저장합니다. 여러 페이지는 ZIP 파일로 저장합니다.',

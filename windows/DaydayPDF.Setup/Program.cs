@@ -24,6 +24,13 @@ internal static class Program
     private static readonly string Marker = Path.Combine(InstallRoot, "installed-by-daydaypdf.txt");
     private static readonly string Version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "Preview";
 
+    private static bool IsLegacyQueue(PrintQueue queue)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(queue.Name, @"^DaydayPDF \(([a-zA-Z0-9]+) 고속\)$");
+        return match.Success && queue.Comment == $"DaydayPDF installed printer - {match.Groups[1].Value} EMF"
+            && queue.QueuePort.Name == "NUL:" && queue.QueueDriver.Name == "MS Publisher Color Printer";
+    }
+
     [STAThread]
     public static int Main(string[] args)
     {
@@ -115,7 +122,7 @@ internal static class Program
         if (File.Exists(Executable)) using (File.Open(Executable, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
         using (var server = new LocalPrintServer())
         using (var queues = server.GetPrintQueues())
-            if (queues.Any(queue => (queue.Name == Product || queue.Name == "DaydayPDF (ezPDF 고속)") && queue.NumberOfJobs > 0))
+            if (queues.Any(queue => (queue.Name == Product || IsLegacyQueue(queue)) && queue.NumberOfJobs > 0))
                 throw new IOException("DaydayPDF 인쇄가 끝난 뒤 업데이트하세요.");
         string staging = Path.Combine(InstallRoot, "DaydayPDF.new");
         string backup = Path.Combine(InstallRoot, "DaydayPDF.previous");

@@ -2,8 +2,8 @@ export { correctRecognizedText } from './ocr-runtime.js';
 import { zipSync } from 'fflate';
 import { analyzePdfForDocuments, createSearchablePdf } from './ocr-runtime.js';
 import { DOCUMENT_OUTPUTS } from './document-export-runtime.js';
-import { parseOfficeDocument } from './document-import-runtime.js';
-import { createPdfFromOffice } from './document-pdf-runtime.js';
+import { parseSourceDocument } from './document-import-runtime.js';
+import { createPdfFromDocument } from './document-pdf-runtime.js';
 import { renderPdfToHwp } from './pdf-hwp-runtime.js';
 import { openPdfJs } from './pdf-task-runtime.js';
 
@@ -14,8 +14,8 @@ export async function convertEditorDocument(file, { output, language = 'kor+eng'
   const check = () => context?.throwIfCancelled();
   check();
   if (output === 'import') {
-    const model = parseOfficeDocument(new Uint8Array(await file.arrayBuffer()), file.name);
-    const result = await createPdfFromOffice(model, { title, report: ratio => { check(); report(ratio, 'PDF 만드는 중'); } });
+    const model = parseSourceDocument(new Uint8Array(await file.arrayBuffer()), file.name);
+    const result = await createPdfFromDocument(model, { title, report: ratio => { check(); report(ratio, 'PDF 만드는 중'); } });
     return done(result.bytes, 'pdf', 'application/pdf', result.warnings);
   }
   if (['hwp', 'png', 'jpg'].includes(output)) {

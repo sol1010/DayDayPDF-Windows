@@ -57,7 +57,7 @@ test('OCR and imported PDF results open automatically after saving, with the exa
   for (const output of ['pdf', 'import']) {
     const s = setup();
     s.setOutput(output);
-    const imported = new File(['office'], 'input.docx');
+    const imported = new File(['document'], 'input.docx');
     s.node('#documentInput').files = [imported];
     await s.run();
     assert.deepEqual(s.calls.map(call => call[0]), ['convert', 'save', 'open', 'notify']);
@@ -75,7 +75,7 @@ test('OCR and imported PDF results open automatically after saving, with the exa
   }
 });
 
-test('PPT, Word, Excel, HWP and image results remain downloadable without opening a PDF tab', async () => {
+test('PPTX, DOCX, XLSX, HWP and image results remain downloadable without opening a PDF tab', async () => {
   for (const [output, type] of [['pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
     ['docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
     ['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
@@ -137,7 +137,7 @@ test('repeated clicks while automatic opening is pending cannot duplicate the re
   assert.equal(s.classes.has('show'), false);
 });
 
-test('conversion without a tab uses the chosen PDF and keeps office input independent', async () => {
+test('conversion without a tab uses the chosen PDF and keeps the input document independent', async () => {
   const s = setup({ hasCurrentFile: false, currentFile: () => { throw new Error('No tab may be read'); } });
   assert.equal(s.node('[data-pdf-source]').hidden, false);
   assert.equal(s.node('[data-run]').disabled, true);

@@ -25,7 +25,7 @@ export function wrapDocumentText(text, width, measure) {
   return lines;
 }
 
-export async function createPdfFromOffice(model, { title = 'Document', fontBytes, report = () => {}, selectedSections } = {}) {
+export async function createPdfFromDocument(model, { title = 'Document', fontBytes, report = () => {}, selectedSections } = {}) {
   if (!fontBytes) {
     const response = await fetch('/assets/ocr/SpoqaHanSansRegular.ttf');
     if (!response.ok) throw new Error('PDF 글꼴을 불러오지 못했습니다. 다시 시도하세요.');

@@ -3,11 +3,9 @@ $ErrorActionPreference = 'Stop'
 if (-not $PipePort.StartsWith('\\.\pipe\DaydayPDF.Print.S-1-5-')) { throw '인쇄 포트 경로가 올바르지 않습니다.' }
 $name = 'DaydayPDF'
 $location = '이 PC'
-$oldName = 'DaydayPDF (ezPDF 고속)'
 $driver = 'MS Publisher Color Printer'
 $native = 'Microsoft Print To PDF'
 $legacyComment = 'DaydayPDF installed printer - unified EMF'
-$oldComment = 'DaydayPDF installed printer - ezPDF EMF'
 $pipeComment = 'DaydayPDF installed printer - Microsoft Print To PDF'
 Add-Type -TypeDefinition @'
 using System;
@@ -60,7 +58,10 @@ function Test-Marked {
     $key = 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Print\Printers\DaydayPDF\PrinterDriverData'
     [Microsoft.Win32.Registry]::GetValue($key, 'DaydayPDF.QueueOwner', 0) -eq 1
 }
-function Test-EmfPrinter($p, $label) { $p -and $p.DriverName -eq $driver -and $p.PortName -eq 'NUL:' -and $p.Comment -eq $label }
+function Test-LegacyQueue($p) {
+    if ($p.DriverName -ne $driver -or $p.PortName -ne 'NUL:' -or $p.Name -notmatch '^DaydayPDF \(([a-zA-Z0-9]+) 고속\)$') { return $false }
+    return $p.Comment -eq ('DaydayPDF installed printer - ' + $Matches[1] + ' EMF')
+}
 function Test-PipePrinter($p) { $p -and $p.DriverName -eq $native -and $p.Comment -eq $pipeComment -and $p.PortName -in @($PipePort, 'PORTPROMPT:') }
 function Assert-Idle($printerName) {
     if (Get-PrintJob -PrinterName $printerName -ErrorAction Stop) { throw "$printerName 인쇄가 끝난 뒤 다시 시도하세요." }
@@ -71,11 +72,18 @@ function Remove-OldPort {
     }
 }
 $p = Get-Printer -Name $name -ErrorAction SilentlyContinue
-$f = Get-Printer -Name $oldName -ErrorAction SilentlyContinue
+$legacyQueues = @(Get-Printer | Where-Object { Test-LegacyQueue $_ })
+if ($legacyQueues.Count -gt 1) { throw '이전 프린터 대기열을 하나로 식별할 수 없습니다.' }
+$fast = $legacyQueues.Count -eq 1
+$migrationComments = @($legacyComment)
+if ($fast) {
+    $oldName = $legacyQueues[0].Name
+    $oldComment = $legacyQueues[0].Comment
+    $migrationComments += $oldComment
+}
 $marked = $p -and (Test-Marked)
 $unified = $p -and $p.DriverName -eq $driver -and $p.PortName -eq 'NUL:' -and ($marked -or $p.Comment -eq $legacyComment)
 $pipe = Test-PipePrinter $p
-$fast = Test-EmfPrinter $f $oldComment
 if ($Uninstall) {
     if ($unified -or $pipe) { Assert-Idle $name }
     if ($fast) { Assert-Idle $oldName }
@@ -135,14 +143,14 @@ try {
         if (!(Test-Marked)) { throw 'DaydayPDF 프린터 등록 정보를 확인하지 못했습니다.' }
     }
     $current = Get-Printer -Name $name
-    if ($current.Comment -in @($legacyComment, $oldComment)) { Set-Printer -Name $name -Comment ([string]::Empty) }
+    if ($current.Comment -in $migrationComments) { Set-Printer -Name $name -Comment ([string]::Empty) }
     Set-Printer -Name $name -KeepPrintedJobs $true -Location $location
     $device = Get-CimInstance Win32_Printer -Filter "Name='$name'"
     if ([int](Get-Printer -Name $name).PrinterStatus -band 1) {
         if ((Invoke-CimMethod -InputObject $device -MethodName Resume).ReturnValue -ne 0) { throw '인쇄 대기열을 다시 시작하지 못했습니다.' }
     }
     $result = Get-Printer -Name $name
-    if ((!(Test-Marked) -or $result.DriverName -ne $driver -or $result.PortName -ne 'NUL:' -or $result.Comment -in @($legacyComment, $oldComment)) -or !$result.KeepPrintedJobs -or ([int]$result.PrinterStatus -band 1) -or $result.Location -ne $location) { throw 'DaydayPDF 프린터 등록을 확인하지 못했습니다.' }
+    if ((!(Test-Marked) -or $result.DriverName -ne $driver -or $result.PortName -ne 'NUL:' -or $result.Comment -in $migrationComments) -or !$result.KeepPrintedJobs -or ([int]$result.PrinterStatus -band 1) -or $result.Location -ne $location) { throw 'DaydayPDF 프린터 등록을 확인하지 못했습니다.' }
     if ($oldDefault -eq $name -or ($fast -and $oldDefault -eq $oldName)) {
         if ((Invoke-CimMethod -InputObject $device -MethodName SetDefaultPrinter).ReturnValue -ne 0) { throw '기본 프린터를 복원하지 못했습니다.' }
     }

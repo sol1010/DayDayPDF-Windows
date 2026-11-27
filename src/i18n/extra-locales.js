@@ -327,10 +327,10 @@ export const EXTRA_TRANSLATIONS = {
     "Đặt ảnh trang lên trang chiếu để giữ nguyên hình thức và thêm văn bản nhận dạng dưới dạng đối tượng riêng.",
     "将页面图片放入幻灯片以保留原始外观，并将识别的文字作为独立对象添加。"
   ],
-  "Save recognized text in a Word document. Original images and paragraph layout are not preserved.": [
-    "認識した文字をWord文書に保存します。元の画像や段落の配置は保持されません。",
-    "Lưu văn bản đã nhận dạng vào tài liệu Word. Không giữ hình ảnh và bố cục đoạn văn gốc.",
-    "将识别的文字保存为 Word 文档，不保留原始图片和段落布局。"
+  "Save recognized text in a DOCX document. Original images and paragraph layout are not preserved.": [
+    "認識した文字をDOCX文書に保存します。元の画像や段落の配置は保持されません。",
+    "Lưu văn bản đã nhận dạng vào tài liệu DOCX. Không giữ hình ảnh và bố cục đoạn văn gốc.",
+    "将识别的文字保存为 DOCX 文档，不保留原始图片和段落布局。"
   ],
   "Save recognized text in a sheet for each page. Images, table formatting and formulas are not reconstructed.": [
     "各ページの認識テキストを別々のシートに保存します。画像・表の書式・数式は再現されません。",
@@ -407,45 +407,45 @@ export const EXTRA_TRANSLATIONS = {
     "Định dạng phần, đầu trang, chân trang và đánh số tự động có thể khác bản gốc.",
     "分节格式、页眉、页脚和自动编号可能与原文不同。"
   ],
-  "Vertically merged Excel cells are displayed in their first row.": [
-    "Excelの縦結合セルは最初の行に表示します。",
-    "Ô Excel gộp dọc được hiển thị ở hàng đầu tiên.",
-    "Excel 中纵向合并的单元格会显示在其第一行。"
+  "Vertically merged XLSX cells are displayed in their first row.": [
+    "XLSXの縦結合セルは最初の行に表示します。",
+    "Ô XLSX gộp dọc được hiển thị ở hàng đầu tiên.",
+    "XLSX 中纵向合并的单元格会显示在其第一行。"
   ],
-  "Excel charts, images and shapes are excluded. Cell contents and tables are converted.": [
-    "Excelのグラフ・画像・図形は除外し、セルの内容と表を変換します。",
-    "Không chuyển đổi biểu đồ, ảnh và hình dạng trong Excel. Chỉ chuyển nội dung ô và bảng.",
-    "不包含 Excel 图表、图片和图形，仅转换单元格内容及表格。"
+  "XLSX charts, images and shapes are excluded. Cell contents and tables are converted.": [
+    "XLSXのグラフ・画像・図形は除外し、セルの内容と表を変換します。",
+    "Không chuyển đổi biểu đồ, ảnh và hình dạng trong XLSX. Chỉ chuyển nội dung ô và bảng.",
+    "不包含 XLSX 图表、图片和图形，仅转换单元格内容及表格。"
   ],
-  "Excel formulas use saved calculation results and are not recalculated.": [
-    "Excelの数式は保存済みの計算結果を使い、再計算しません。",
-    "Công thức Excel dùng kết quả tính toán đã lưu và không được tính lại.",
-    "Excel 公式使用已保存的计算结果，不会重新计算。"
+  "XLSX formulas use saved calculation results and are not recalculated.": [
+    "XLSXの数式は保存済みの計算結果を使い、再計算しません。",
+    "Công thức XLSX dùng kết quả tính toán đã lưu và không được tính lại.",
+    "XLSX 公式使用已保存的计算结果，不会重新计算。"
   ],
-  "Grouped PowerPoint shapes are unsupported. Ungroup them before converting.": [
-    "PowerPointのグループ化された図形には対応していません。グループを解除してから変換してください。",
-    "Không hỗ trợ hình dạng được nhóm trong PowerPoint. Hãy bỏ nhóm trước khi chuyển đổi.",
-    "不支持 PowerPoint 组合图形。请先取消组合再转换。"
+  "Grouped PPTX shapes are unsupported. Ungroup them before converting.": [
+    "PPTXのグループ化された図形には対応していません。グループを解除してから変換してください。",
+    "Không hỗ trợ hình dạng được nhóm trong PPTX. Hãy bỏ nhóm trước khi chuyển đổi.",
+    "不支持 PPTX 组合图形。请先取消组合再转换。"
   ],
-  "Some PowerPoint elements positioned by the slide master are not displayed.": [
-    "スライドマスターで配置された一部のPowerPoint要素は表示されません。",
-    "Một số thành phần PowerPoint được định vị bởi trang chiếu cái sẽ không hiển thị.",
-    "部分通过幻灯片母版定位的 PowerPoint 元素不会显示。"
+  "Some PPTX elements positioned by the slide master are not displayed.": [
+    "スライドマスターで配置された一部のPPTX要素は表示されません。",
+    "Một số thành phần PPTX được định vị bởi trang chiếu cái sẽ không hiển thị.",
+    "部分通过幻灯片母版定位的 PPTX 元素不会显示。"
   ],
-  "PowerPoint image cropping and rotation may differ from the original.": [
-    "PowerPoint画像のトリミングや回転は原本と異なる場合があります。",
-    "Cắt và xoay ảnh PowerPoint có thể khác bản gốc.",
-    "PowerPoint 图片的裁剪和旋转可能与原文不同。"
+  "PPTX image cropping and rotation may differ from the original.": [
+    "PPTX画像のトリミングや回転は原本と異なる場合があります。",
+    "Cắt và xoay ảnh PPTX có thể khác bản gốc.",
+    "PPTX 图片的裁剪和旋转可能与原文不同。"
   ],
-  "PowerPoint tables, charts and SmartArt are unsupported.": [
-    "PowerPointの表・グラフ・SmartArtには対応していません。",
-    "Không hỗ trợ bảng, biểu đồ và SmartArt trong PowerPoint.",
-    "不支持 PowerPoint 表格、图表和 SmartArt。"
+  "PPTX tables, charts and diagrams are unsupported.": [
+    "PPTXの表・グラフ・図表には対応していません。",
+    "Không hỗ trợ bảng, biểu đồ và sơ đồ trong PPTX.",
+    "不支持 PPTX 表格、图表和 图示。"
   ],
-  "The placement of rotated PowerPoint elements may differ from the original.": [
-    "回転したPowerPoint要素の位置は原本と異なる場合があります。",
-    "Vị trí của các thành phần PowerPoint được xoay có thể khác bản gốc.",
-    "旋转后的 PowerPoint 元素位置可能与原文不同。"
+  "The placement of rotated PPTX elements may differ from the original.": [
+    "回転したPPTX要素の位置は原本と異なる場合があります。",
+    "Vị trí của các thành phần PPTX được xoay có thể khác bản gốc.",
+    "旋转后的 PPTX 元素位置可能与原文不同。"
   ],
   "Converts HWPX text, basic tables and images. Fonts, detailed formatting and floating object placement may differ.": [
     "HWPXの文字・基本的な表・画像を変換します。フォント・詳細な書式・浮動オブジェクトの位置は異なる場合があります。",
@@ -477,10 +477,10 @@ export const EXTRA_TRANSLATIONS = {
     "Chọn ít nhất một trang tính để chuyển đổi.",
     "请至少选择一张要转换的工作表。"
   ],
-  "Some formulas have no saved result. Calculate and save the workbook in Excel before converting.": [
-    "保存された結果のない数式があります。Excelで再計算して保存してから変換してください。",
-    "Một số công thức không có kết quả đã lưu. Hãy tính toán và lưu sổ làm việc trong Excel trước khi chuyển đổi.",
-    "部分公式没有保存的结果。请先在 Excel 中计算并保存工作簿，再进行转换。"
+  "Some formulas have no saved result. Recalculate and save the workbook before converting.": [
+    "保存された結果のない数式があります。再計算して保存してから変換してください。",
+    "Một số công thức không có kết quả đã lưu. Hãy tính toán và lưu sổ làm việc trước khi chuyển đổi.",
+    "部分公式没有保存的结果。请先重新计算并保存工作簿，再进行转换。"
   ],
   "Documents to PDF": [
     "文書をPDFに変換",
@@ -492,20 +492,20 @@ export const EXTRA_TRANSLATIONS = {
     "Nhận dạng PDF",
     "PDF OCR 文字识别"
   ],
-  "PDF to PowerPoint": [
-    "PDFをPowerPointに変換",
-    "PDF sang PowerPoint",
-    "PDF 转 PowerPoint"
+  "PDF to PPTX": [
+    "PDFをPPTXに変換",
+    "PDF sang PPTX",
+    "PDF 转 PPTX"
   ],
-  "PDF to Word": [
-    "PDFをWordに変換",
-    "PDF sang Word",
-    "PDF 转 Word"
+  "PDF to DOCX": [
+    "PDFをDOCXに変換",
+    "PDF sang DOCX",
+    "PDF 转 DOCX"
   ],
-  "PDF to Excel": [
-    "PDFをExcelに変換",
-    "PDF sang Excel",
-    "PDF 转 Excel"
+  "PDF to XLSX": [
+    "PDFをXLSXに変換",
+    "PDF sang XLSX",
+    "PDF 转 XLSX"
   ],
   "The selected font has been applied.": [
     "選択したフォントを適用しました。",
@@ -2489,10 +2489,10 @@ export const EXTRA_TRANSLATIONS = {
     "PDF có thể tìm kiếm",
     "可搜索 PDF"
   ],
-  "Word document": [
-    "Word文書",
-    "Tài liệu Word",
-    "Word 文档"
+  "DOCX document": [
+    "DOCX文書",
+    "Tài liệu DOCX",
+    "DOCX 文档"
   ],
   "Recognition quality": [
     "認識品質",

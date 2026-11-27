@@ -116,9 +116,10 @@ export function createPrintDialogController({
       const result = await getPrinters();
       if (currentOpening !== opening || !visible()) return;
       const printers = result.printers;
-      const savedPrinter = preferences.printer === 'DaydayPDF (ezPDF 고속)' ? 'DaydayPDF' : preferences.printer;
+      const savedPrinter = preferences.printer;
       const chosen = savedPrinter
         ? printers.find(item => item.name.toLowerCase() === savedPrinter.toLowerCase())
+          || (/^DaydayPDF \([a-z0-9]+ 고속\)$/i.test(savedPrinter) ? printers.find(item => item.name === 'DaydayPDF') : undefined)
         : printers.find(item => item.isDefault) || printers[0];
       $('prPrinter').replaceChildren(...printers.map(printer => {
         const option = target.ownerDocument.createElement('option');
