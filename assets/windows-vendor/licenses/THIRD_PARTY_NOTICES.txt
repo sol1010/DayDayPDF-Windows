@@ -80,7 +80,7 @@ Windows 설치본에는 아래 글꼴이 포함됩니다. PC에 설치한 다른
 
 OCR / 문서 변환 및 PDF 프린터
 --------------------------------
-Tesseract.js / Core 7.0.0 (Apache-2.0), tessdata_best kor/eng (Apache-2.0), fflate 0.8.3 (MIT), Spoqa Han Sans 3.3.0 (OFL-1.1).
+Tesseract.js / Core 7.0.0 (Apache-2.0), tessdata_best 및 tessdata_fast kor/eng (Apache-2.0, tessdata_fast 87416418657359cb625c412a48b6e1d6d41c29bd), fflate 0.8.3 (MIT), Spoqa Han Sans 3.3.0 (OFL-1.1).
 전체 원문 및 정적 의존성 고지: licenses/document-tools/NOTICES.txt
 Windows Microsoft Print To PDF는 설치된 운영체제 구성요소를 사용하며 제품에 드라이버를 재배포하지 않습니다.
 본 제품은 한컴의 HWP 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다.
@@ -89,7 +89,7 @@ PC PDF 암호 설정·해제
 QPDF WASM: Apache License 2.0
 qpdf-run 0.2.1: MIT License, Copyright (c) 2026 CrabPDF contributors
 동봉 고지: licenses/document-tools/qpdf-apache-2.0.txt, qpdf-NOTICE.txt, qpdf-run-MIT.txt
-인쇄 수신기는 Windows 기본 Microsoft Print To PDF 드라이버와 .NET API를 사용합니다. 외부 PDF 변환 프로그램이나 별도 프린터 드라이버를 포함하지 않습니다.
+인쇄 수신기는 Windows 기본 Microsoft Print To PDF 드라이버와 .NET API를 사용합니다. 사용자 용지 복원에는 PDFsharp 6.2.4 (MIT, © 2026 empira)를 사용합니다. 동봉 고지는 licenses/document-tools/PDFsharp-MIT.txt 및 Microsoft-print-libraries-MIT.txt에 있습니다. 외부 PDF 변환 프로그램이나 별도 프린터 드라이버를 포함하지 않습니다.
 
 Microsoft.Web.WebView2 SDK: BSD-3-Clause. See WebView2-SDK-LICENSE.txt and WebView2-SDK-NOTICE.txt in assets/windows-vendor/licenses.
 .NET and Windows Desktop runtime notices are in assets/windows-vendor/licenses/dotnet-*.

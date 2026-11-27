@@ -12,9 +12,12 @@ internal sealed class WindowsPdfReplay : IDisposable
     private readonly string title;
     private IntPtr dc;
     private bool active;
+    private string? defaultBeforeReplay;
     private readonly SpoolFonts fonts = new();
     private byte[]? lastMode;
     private int[] sourceCaps = [];
+    private ReplaySheet? sheet;
+    private readonly List<ReplaySheet?> pages = [];
 
     [StructLayout(LayoutKind.Sequential)]
     private struct QueueInfo
@@ -96,16 +99,13 @@ internal sealed class WindowsPdfReplay : IDisposable
             if ((nativeFields & 0x10) != 0) Marshal.WriteInt16(settings, 84, 100);
             for (int offset = 76; offset <= 82; offset += 2)
                 Marshal.WriteInt16(settings, offset, BitConverter.ToInt16(source, offset));
-            if (DocumentProperties(IntPtr.Zero, handle, printer, settings, settings, 10) != 1) throw new Win32Exception();
+            if (DocumentProperties(IntPtr.Zero, handle, printer, settings, settings, 10) != 1 &&
+                DocumentProperties(IntPtr.Zero, handle, printer, settings, IntPtr.Zero, 2) != 1) throw new Win32Exception();
             var next = dc == IntPtr.Zero ? CreateDC("WINSPOOL", printer, null, settings) : ResetDC(dc, settings);
             if (next == IntPtr.Zero) throw new Win32Exception();
             dc = next;
-            for (int axis = 0; axis < 2; axis++)
-            {
-                double sourceMm = sourceCaps[4 + axis] * 25.4 / sourceCaps[2 + axis];
-                double targetMm = GetDeviceCaps(dc, 110 + axis) * 25.4 / GetDeviceCaps(dc, 88 + 2 * axis);
-                if (Math.Abs(sourceMm - targetMm) > 1) throw new InvalidDataException("Windows PDF가 선택한 용지 크기를 지원하지 않습니다.");
-            }
+            var targetCaps = new[] { 8, 10, 88, 90, 110, 111, 112, 113 }.Select(i => GetDeviceCaps(dc, i)).ToArray();
+            sheet = ReplaySheet.Map(source, sourceCaps, targetCaps);
             lastMode = source;
         }
         finally { Marshal.FreeHGlobal(settings); ClosePrinter(handle); }
@@ -116,7 +116,8 @@ internal sealed class WindowsPdfReplay : IDisposable
         int pixels = BitConverter.ToInt32(page, 72 + 4 * axis), mm = BitConverter.ToInt32(page, 80 + 4 * axis);
         if (mm <= 0 || pixels <= 0) throw new InvalidDataException("페이지 기준 크기가 잘못되었습니다.");
         double offset = BitConverter.ToInt32(page, frameOffset) * (double)pixels / (100 * (double)mm);
-        return checked((int)Math.Round((sourceCaps[6 + axis] + offset) * GetDeviceCaps(dc, 88 + 2 * axis) / sourceCaps[2 + axis]) - GetDeviceCaps(dc, 112 + axis));
+        double pixel = (sourceCaps[6 + axis] + offset) * GetDeviceCaps(dc, 88 + 2 * axis) / sourceCaps[2 + axis];
+        return checked((int)Math.Round(sheet is null ? pixel - GetDeviceCaps(dc, 112 + axis) : pixel * sheet.Scale));
     }
 
     internal void ReadFonts(Stream input, int length, byte[] mode, CancellationToken stop)
@@ -170,6 +171,7 @@ internal sealed class WindowsPdfReplay : IDisposable
         for (int at = 0; at < length;)
         {
             stop.ThrowIfCancellationRequested();
+            ReceiverProgress.Advanced();
             if (length - at < 8) throw new InvalidDataException();
             type = BitConverter.ToInt32(page, at);
             int size = BitConverter.ToInt32(page, at + 4);
@@ -188,6 +190,7 @@ internal sealed class WindowsPdfReplay : IDisposable
         {
             fonts.Activate();
             var doc = new DocInfo { Size = Marshal.SizeOf<DocInfo>(), Name = title, Output = path };
+            defaultBeforeReplay = ReplayDefaultPrinter.Capture(printer);
             if (StartDoc(dc, ref doc) <= 0) throw new Win32Exception();
             active = true;
         }
@@ -198,6 +201,7 @@ internal sealed class WindowsPdfReplay : IDisposable
         try
         {
             if (StartPage(dc) <= 0 || !PlayEnhMetaFile(dc, emf, ref frame) || EndPage(dc) <= 0) throw new Win32Exception();
+            pages.Add(sheet);
         }
         finally { DeleteEnhMetaFile(emf); }
     }
@@ -208,19 +212,20 @@ internal sealed class WindowsPdfReplay : IDisposable
         active = false;
         var inactivity = System.Diagnostics.Stopwatch.StartNew();
         long lastSize = -1;
-        while (inactivity.Elapsed < TimeSpan.FromMinutes(3))
+        while (true)
         {
             stop.ThrowIfCancellationRequested();
             try
             {
                 using var result = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                if (result.Length != lastSize) { lastSize = result.Length; inactivity.Restart(); }
-                if (CompletePdf(result)) return;
+                if (result.Length != lastSize) { lastSize = result.Length; inactivity.Restart(); ReceiverProgress.Advanced(); }
+                if (CompletePdf(result)) break;
             }
             catch (IOException) { }
             stop.WaitHandle.WaitOne(150);
+            if (inactivity.Elapsed >= TimeSpan.FromMinutes(3)) throw new IOException("Windows PDF 출력이 완료되지 않았습니다.");
         }
-        throw new IOException("Windows PDF 출력이 완료되지 않았습니다.");
+        ReplaySheet.Restore(path, pages, stop);
     }
 
     internal static bool CompletePdf(Stream file)
@@ -241,6 +246,7 @@ internal sealed class WindowsPdfReplay : IDisposable
         if (active) AbortDoc(dc);
         if (dc != IntPtr.Zero) DeleteDC(dc);
         fonts.Dispose();
+        ReplayDefaultPrinter.Restore(defaultBeforeReplay, printer);
     }
 }
 

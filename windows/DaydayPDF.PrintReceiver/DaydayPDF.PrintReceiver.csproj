@@ -10,5 +10,10 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="PDFsharp" Version="6.2.4" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.15" />
+    <InternalsVisibleTo Include="DaydayPDF.PrintReceiver.Tests" />
+  </ItemGroup>
   <ItemGroup><Compile Include="../Shared/PrintInbox.cs" Link="PrintInbox.cs" /></ItemGroup>
 </Project>

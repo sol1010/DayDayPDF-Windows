@@ -45,7 +45,8 @@ export function createPrintDialogController({
       if ($(id) && !(name === 'mode' && isLocked())) next[name] = $(id).value;
     }
     if ($('prCopies')?.validity.valid) next.copies = Number($('prCopies').value);
-    if ($('prPrinter')?.selectedOptions.length) next.printer = $('prPrinter').value;
+    const printer = $('prPrinter');
+    if (printer && !printer.disabled && printer.value) next.printer = printer.value;
     preferences = normalizePrintPreferences(next, paperChoices);
     try { writePreferences(JSON.stringify(preferences)); } catch {   }
   }
@@ -110,13 +111,15 @@ export function createPrintDialogController({
     $('prDesktopOptions').hidden = false;
     $('prOk').disabled = true;
     $('prPrinter').disabled = true;
+    $('prPrinter').replaceChildren();
     try {
       const result = await getPrinters();
       if (currentOpening !== opening || !visible()) return;
       const printers = result.printers;
       const savedPrinter = preferences.printer === 'DaydayPDF (ezPDF 고속)' ? 'DaydayPDF' : preferences.printer;
-      const chosen = printers.find(item => item.name === savedPrinter)
-        || printers.find(item => item.isDefault) || printers[0];
+      const chosen = savedPrinter
+        ? printers.find(item => item.name.toLowerCase() === savedPrinter.toLowerCase())
+        : printers.find(item => item.isDefault) || printers[0];
       $('prPrinter').replaceChildren(...printers.map(printer => {
         const option = target.ownerDocument.createElement('option');
         option.value = printer.name; option.textContent = printer.name;
@@ -124,7 +127,14 @@ export function createPrintDialogController({
         option.selected = printer === chosen;
         return option;
       }));
-      $('prOk').disabled = !printers.length;
+      if (!chosen && printers.length) {
+        const option = target.ownerDocument.createElement('option');
+        option.value = ''; option.disabled = true;
+        option.textContent = text('저장된 프린터를 사용할 수 없습니다. 프린터를 선택하세요.');
+        $('prPrinter').prepend(option);
+        $('prPrinter').value = '';
+      }
+      $('prOk').disabled = !chosen;
       $('prPrinter').disabled = !printers.length;
       void update();
       if (!printers.length) notify('설치된 프린터가 없습니다.');
@@ -164,7 +174,10 @@ export function createPrintDialogController({
     zoom = Math.min(4, Math.max(.4, zoom * (event.deltaY < 0 ? 1.2 : 1 / 1.2)));
     void update();
   }, { passive: false });
-  for (const id of fields) $(id)?.addEventListener('change', () => { save(); void update(); });
+  for (const id of fields) $(id)?.addEventListener('change', () => {
+    if (id === 'prPrinter') $('prOk').disabled = !$('prPrinter').value;
+    save(); void update();
+  });
   $('prRange').addEventListener('change', () => {
     position = 0;
     $('prCustomRow').style.display = $('prRange').value === 'custom' ? '' : 'none';

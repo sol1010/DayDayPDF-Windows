@@ -1,3 +1,4 @@
+export { correctRecognizedText } from './ocr-runtime.js';
 import { zipSync } from 'fflate';
 import { analyzePdfForDocuments, createSearchablePdf } from './ocr-runtime.js';
 import { DOCUMENT_OUTPUTS } from './document-export-runtime.js';
@@ -6,7 +7,7 @@ import { createPdfFromOffice } from './document-pdf-runtime.js';
 import { renderPdfToHwp } from './pdf-hwp-runtime.js';
 import { openPdfJs } from './pdf-task-runtime.js';
 
-export async function convertEditorDocument(file, { output, language = 'kor+eng', quality = 'balanced', forceOcr = false, report = () => {}, context } = {}) {
+export async function convertEditorDocument(file, { output, language = 'kor+eng', quality = 'balanced', forceOcr = false, pageRange = '', reviewPage, withDocument, report = () => {}, context } = {}) {
   if (file.size > 100 * 1024 * 1024) throw new Error('100MB 이하 문서를 사용하세요. 큰 PDF는 나눈 뒤 변환하세요.');
   const title = file.name.replace(/\.[^.]+$/, '');
   const done = (bytes, extension, type, warnings = []) => ({ bytes, name: `${title}.${extension}`, type, warnings });
@@ -49,14 +50,23 @@ export async function convertEditorDocument(file, { output, language = 'kor+eng'
       return done(zipSync(files, { level: 0 }), 'zip', 'application/zip');
     } finally { await pdf.loadingTask.destroy(); }
   }
-  if (!['pdf', 'pptx', 'docx', 'xlsx'].includes(output)) throw new Error('지원하지 않는 변환 형식입니다.');
-  const analysis = await analyzePdfForDocuments(file, { language, quality, forceOcr,
+  const pdfMode = output === 'editable-pdf' ? 'editable' : output === 'pdf' ? 'searchable' : null;
+  if (!pdfMode && !['pptx', 'docx', 'xlsx'].includes(output)) throw new Error('지원하지 않는 변환 형식입니다.');
+  const analysis = await analyzePdfForDocuments(file, { language, quality, forceOcr, pdfMode, pageRange, reviewPage, withDocument,
     includePageImages: output === 'pptx', context,
     report: (ratio, message) => report(ratio * .85, message) });
   check();
-  if (output === 'pdf') return done(await createSearchablePdf(analysis.bytes, analysis.pages, {
-    report: (ratio, message) => { check(); report(.85 + ratio * .15, message || '검색 가능한 PDF 만드는 중'); },
-  }), 'pdf', 'application/pdf');
+  if (pdfMode) {
+    const editable = pdfMode === 'editable';
+    const warnings = [];
+    if (editable) {
+      const kept = analysis.pages.reduce((n, p) => n + (p.ocrApplied ? p.lines.filter(l => !l.appearance).length : 0), 0);
+      if (kept) warnings.push(`배경이 복잡한 ${kept}개 줄은 원본 모양과 검색 텍스트를 유지했습니다.`);
+    }
+    const bytes = await createSearchablePdf(analysis.bytes, analysis.pages, { editable,
+      report: (ratio, message) => { check(); report(.85 + ratio * .15, message); } });
+    return { ...done(bytes, 'pdf', 'application/pdf', warnings), name: title + (editable ? '-OCR-편집.pdf' : '-OCR.pdf') };
+  }
   report(.9, '문서 만드는 중');
   return done(DOCUMENT_OUTPUTS[output].create(analysis.pages, { title }), output, DOCUMENT_OUTPUTS[output].type);
 }

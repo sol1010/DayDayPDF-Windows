@@ -254,3 +254,8 @@
 .mgOpenRow input { width:16px; height:16px; flex:none; accent-color:var(--accent); }
 .mgOpenName { min-width:0; flex:1; overflow-wrap:anywhere; }
 .mgOpenCount { flex:none; color:var(--dim); }
+
+.documentToolsDialog [data-ocr-review]{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:8px;min-width:0}
+.documentToolsDialog [data-review-preview]{display:block;max-width:100%;max-height:96px;width:auto;margin:8px 0}
+.documentToolsDialog [data-review-text]{box-sizing:border-box;width:100%;margin-bottom:8px}
+.documentToolsDialog [data-review-position]{white-space:nowrap;font-variant-numeric:tabular-nums}

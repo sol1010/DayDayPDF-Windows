@@ -7598,7 +7598,7 @@ $('prOk').onclick = async () => {
       } else bytes = await buildPrintPdf(list, pdfPrinter ? null : name);
       if (abort.signal.aborted) throw new DOMException('인쇄 준비를 취소했습니다.', 'AbortError');
       if (pdfPrinter && !(raster && paper === 'auto' && copies === 1))
-        bytes = await makePdfPrintCopy(PDFLib, bytes, { copies, orientation: orient, paper, signal: abort.signal, name });
+        bytes = await makePdfPrintCopy(PDFLib, bytes, { copies, orientation: orient, paper, signal: abort.signal, name, flattenAnnotations: flattenPrintAnnotations });
       abort.signal.throwIfAborted();
       if (!pdfPrinter && orient === 'auto') {
         ({ bytes, mediaRuns } = await alignPrinterMedia(PDFLib, bytes, mediaRuns, abort.signal));
@@ -8699,7 +8699,12 @@ ctxMenu.addEventListener('click', e => {
   }
 });
 
+function loadEditorDocumentRuntime() {
+  return import('/assets/editor-tools/runtime.js?v=' + encodeURIComponent(document.querySelector('meta[name="pdf-editor-version"]')?.content || 'dev'));
+}
+
 const editorDocumentTools = createEditorDocumentTools({
+  withDocument: withPdfiumDoc,
   hasCurrentFile: () => editorStore.pages.length > 0,
   prepareSelectedFile(file) { requireWindowsNewWork({ throwOnBlocked: true }); return file; },
   async getCurrentFile() {
@@ -8728,7 +8733,7 @@ const editorDocumentTools = createEditorDocumentTools({
     return editorStore.documents.some(document => !existing.has(document));
   },
   notify: message => toast(message, 4000),
-  loadRuntime: () => import('/assets/editor-tools/runtime.js?v=' + encodeURIComponent(document.querySelector('meta[name="pdf-editor-version"]')?.content || 'dev')),
+  loadRuntime: loadEditorDocumentRuntime,
 });
 $('btnDocumentTools').onclick = () => editorDocumentTools.open();
 const editorSecurity = createEditorSecurity({
@@ -9728,6 +9733,34 @@ async function withRegionSource(bytes, callback) {
   }
 }
 
+function saveFlattenedPdf(F, M, doc) {
+  const writer = F.PDFiumExt_OpenFileWriter();
+  let ptr = 0;
+  try {
+    if (!F.PDFiumExt_SaveAsCopy(doc, writer)) throw new Error('주석 복사 실패');
+    const size = F.PDFiumExt_GetFileWriterSize(writer);
+    ptr = M.wasmExports.malloc(size);
+    if (!ptr) throw new Error('주석을 복사할 메모리가 부족합니다');
+    F.PDFiumExt_GetFileWriterData(writer, ptr, size);
+    return M.HEAPU8.slice(ptr, ptr + size);
+  } finally { if (ptr) M.wasmExports.free(ptr); F.PDFiumExt_CloseFileWriter(writer); }
+}
+
+async function flattenPrintAnnotations(bytes, indices, signal) {
+  return withPdfiumDoc(bytes, async (F, M, doc) => {
+    for (const [i, index] of indices.entries()) {
+      if (i && i % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+      signal?.throwIfAborted();
+      const page = F.FPDF_LoadPage(doc, index);
+      if (!page) throw new Error('인쇄할 주석 페이지를 열 수 없습니다');
+      try {
+        if (!F.FPDFPage_Flatten(page, 1)) throw new Error('인쇄용 주석을 적용하지 못했습니다');
+      } finally { F.FPDF_ClosePage(page); }
+    }
+    return saveFlattenedPdf(F, M, doc);
+  });
+}
+
 async function flattenRegionAnnotations(bytes, synthesize) {
   return withPdfiumDoc(bytes, (F, M, doc) => {
     const page = F.FPDF_LoadPage(doc, 0), appearances = [];
@@ -9751,15 +9784,7 @@ async function flattenRegionAnnotations(bytes, synthesize) {
       }
       if (!F.FPDFPage_Flatten(page, 0)) throw new Error('주석 표시를 고정할 수 없습니다');
     } finally { if (page) F.FPDF_ClosePage(page); }
-    const writer = F.PDFiumExt_OpenFileWriter();
-    let ptr = 0;
-    try {
-      if (!F.PDFiumExt_SaveAsCopy(doc, writer)) throw new Error('주석 복사 실패');
-      const size = F.PDFiumExt_GetFileWriterSize(writer);
-      ptr = M.wasmExports.malloc(size);
-      F.PDFiumExt_GetFileWriterData(writer, ptr, size);
-      return { bytes:M.HEAPU8.slice(ptr, ptr + size), appearances };
-    } finally { if (ptr) M.wasmExports.free(ptr); F.PDFiumExt_CloseFileWriter(writer); }
+    return { bytes: saveFlattenedPdf(F, M, doc), appearances };
   });
 }
 
@@ -11370,37 +11395,67 @@ async function origApplyOcrText(k, hit, newText, style = {}, prepared = null) {
   }
 }
 
-function origShowOcrUnavailable(text, error) {
+async function origEditOcrText(k, hit, st, failure = null) {
   if (document.querySelector('.ocrUnavailableDialog')) return;
+  const ctx = editContext(k), p = ctx.page, src = p.src, idx = p.idx;
+  const unchanged = () => contextValid(ctx) && p.src === src && p.idx === idx;
+  const text = await origReadTextContent(p, hit.i);
+  if (!unchanged()) return;
   const dialog = document.createElement('dialog'); dialog.className = 'ocrUnavailableDialog';
-  dialog.dataset.reason = error.reason || 'analysis-failed';
-  dialog.setAttribute('aria-labelledby', 'ocrUnavailableTitle');
-  dialog.setAttribute('aria-describedby', 'ocrUnavailableNote');
-  const title = document.createElement('h3'); title.id = 'ocrUnavailableTitle';
-  title.textContent = error.code === 'OCR_EDIT_UNAVAILABLE' ? 'OCR 텍스트 수정 불가' : 'OCR 분석을 완료하지 못했습니다';
-  const note = document.createElement('p'); note.id = 'ocrUnavailableNote';
-  note.textContent = error.code === 'OCR_EDIT_UNAVAILABLE'
-    ? '원본 모양을 유지하기 어려운 문장입니다. 검색과 복사는 계속 사용할 수 있습니다'
-    : error.message;
-  const input = document.createElement('textarea'); input.value = text; input.readOnly = true;
-  input.rows = 3; input.setAttribute('aria-label', 'OCR 문장');
+  const title = document.createElement('h3'); title.textContent = '인식 문자 편집';
+  dialog.setAttribute('aria-label', title.textContent);
+  const note = document.createElement('p');
+  note.textContent = failure ? '이 줄은 검색 글자만 교정할 수 있습니다.' : '검색 글자를 교정하면 원본 스캔 모양은 유지됩니다.';
+  const input = document.createElement('textarea'); input.value = text; input.rows = 2;
+  input.setAttribute('aria-label', '인식한 글자'); input.spellcheck = false;
   const actions = document.createElement('div'); actions.className = 'ocrEditActions';
-  const close = document.createElement('button'); close.textContent = '닫기';
-  close.addEventListener('click', () => dialog.close());
+  const close = document.createElement('button'); close.textContent = '닫기'; close.onclick = () => dialog.close();
+  const visual = document.createElement('button'); visual.textContent = '스캔 글자 편집';
+  visual.onclick = () => { dialog.close(); if (unchanged()) origEditOcrAppearance(k, hit, st); };
+  const apply = document.createElement('button'); apply.textContent = '검색 글자 적용'; apply.className = 'primary';
+  apply.onclick = async () => {
+    const value = input.value.replace(/[\r\n]+/g, ' ').normalize('NFC').trim();
+    if (!unchanged() || text === value) { dialog.close(); return; }
+    apply.disabled = visual.disabled = true;
+    try {
+      const [x0,y0,x1,y1] = hit.b, item = hit.ocrItem;
+      let origin = [x0,y0], right = [x1,y0], top = [x0,y1];
+      if (item) {
+        const [a,b,c,d,e,f] = item.transform, w = Math.hypot(a,b);
+        const lo = hit.ocrStyle?.descent ?? -.25, hi = hit.ocrStyle?.ascent ?? 1;
+        if (w > 0) {
+          origin = [e+c*lo, f+d*lo]; right = [origin[0]+a*item.width/w, origin[1]+b*item.width/w];
+          top = [e+c*hi, f+d*hi];
+        }
+      }
+      const runtime = await loadEditorDocumentRuntime();
+      const bytes = await runtime.correctRecognizedText(sources.get(src).bytes, idx, hit.i,
+        { text: value, pdfBox: { x0,y0,x1,y1 }, pdfOrigin: origin, pdfRight: right, pdfTop: top }, withPdfiumDoc);
+      if (!unchanged() || !dialog.open) return;
+      const snap = makeSnap();
+      if (!await origSwapSource(p, bytes, () => unchanged() && dialog.open)) return;
+      p.idx = 0; pushSnap(snap); origClearSel(); dialog.close();
+      const wrap = document.getElementById('pg' + k);
+      if (wrap) { delete wrap.dataset.origGhosts; enqueueRender(wrap); }
+      scheduleThumbRefresh(k); origDecorateVisible();
+    } catch (e) { note.textContent = e.message; }
+    finally { apply.disabled = visual.disabled = false; }
+  };
+  actions.append(close); if (!failure) actions.append(visual); actions.append(apply);
+  dialog.append(title, note, input, actions);
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  dialog.addEventListener('keydown', event => event.stopPropagation());
-  actions.append(close); dialog.append(title, note, input, actions); document.body.append(dialog);
-  dialog.showModal(); close.focus();
+  dialog.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229 && !e.shiftKey && e.target === input) { e.preventDefault(); apply.click(); } });
+  document.body.append(dialog); dialog.showModal(); input.focus(); input.select();
 }
 
-async function origEditOcrText(k, hit, st) {
+async function origEditOcrAppearance(k, hit, st) {
   const ctx = editContext(k), p = ctx.page, src = p.src, idx = p.idx;
   const unchanged = () => contextValid(ctx) && p.src === src && p.idx === idx;
   const text = await origReadTextContent(p, hit.i);
   toast('글자 위치와 글꼴을 분석합니다. 최초 분석에는 시간이 걸릴 수 있습니다', 5000);
   let model;
   try { model = await origPrepareOcrEdit(k, hit, st, text); }
-  catch (error) { if (unchanged()) origShowOcrUnavailable(text, error); return; }
+  catch (error) { if (unchanged()) await origEditOcrText(k, hit, st, error); return; }
   if (!unchanged() || document.querySelector('.ocrEditPanel')) return;
   origClearSel();
   const wrap = document.getElementById('pg' + k), { view, rT } = await origView(p);
@@ -12398,7 +12453,8 @@ async function origInlineEditText(k, hit) {
     }, '텍스트 수정');  
   };
   inp.addEventListener('keydown', e => {
-    e.stopPropagation();  
+    e.stopPropagation();
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter') { e.preventDefault(); finish(true); }  
     else if (e.key === 'Escape') finish(false);
   });

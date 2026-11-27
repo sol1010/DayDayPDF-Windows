@@ -51,9 +51,20 @@ export async function withPrintTitle(pdfLib, bytes, name) {
   return pdf.save();
 }
 
-export async function makePdfPrintCopy(pdfLib, bytes, { paper, orientation, copies, name, signal }) {
+export async function makePdfPrintCopy(pdfLib, bytes, { paper, orientation, copies, name, signal, flattenAnnotations }) {
   if (!Number.isInteger(copies) || copies < 1 || copies > 999) throw new Error('인쇄 매수를 확인하세요.');
-  const source = await pdfLib.PDFDocument.load(bytes);
+  let source = await pdfLib.PDFDocument.load(bytes, { updateMetadata: false });
+  const annotated = source.getPages().flatMap((page, i) => {
+    const annots = page.node.Annots();
+    for (let j = 0; j < (annots?.size() || 0); j++) {
+      const annot = annots.lookup(j);
+      if (!(annot instanceof pdfLib.PDFDict)) continue;
+      const flags = annot.lookupMaybe(pdfLib.PDFName.of('F'), pdfLib.PDFNumber)?.asNumber() || 0;
+      if ((flags & 4) && !(flags & 2)) return [i];
+    }
+    return [];
+  });
+  if (annotated.length) source = await pdfLib.PDFDocument.load(await flattenAnnotations(bytes, annotated, signal), { updateMetadata: false });
   const output = await pdfLib.PDFDocument.create();
   if (name) output.setTitle(name);
   const pages = [];

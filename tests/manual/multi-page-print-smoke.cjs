@@ -25,6 +25,14 @@ const server = http.createServer((req, res) => {
  for(let i=0;i<pixels.length;i++){n^=n<<13;n^=n>>>17;n^=n<<5;pixels[i]=n&255;}
  const image=pdf.context.register(pdf.context.flateStream(pixels,{Type:'XObject',Subtype:'Image',Width:512,Height:512,ColorSpace:'DeviceRGB',BitsPerComponent:8}));
  for(let i=0;i<30;i++){const p=pdf.addPage([2384,1684]),name=p.node.newXObject('SharedDrawing',image);p.pushOperators(pdfLib.pushGraphicsState(),pdfLib.concatTransformationMatrix(700,0,0,700,100,100),pdfLib.drawObject(name),pdfLib.popGraphicsState());p.drawText('DRAWING PAGE '+(i+1),{x:400,y:1000,size:32});}
+ const field=pdf.getForm().createTextField('Inspection');
+ field.setText('PRINT FIELD');field.addToPage(pdf.getPage(0),{x:100,y:400,width:220,height:30});
+ const hidden=pdf.getForm().createTextField('Internal');
+ hidden.setText('HIDDEN FIELD');hidden.addToPage(pdf.getPage(0),{x:100,y:300,width:220,height:30,hidden:true});
+ const font=await pdf.embedFont(pdfLib.StandardFonts.Helvetica);
+ const mark=pdf.context.formXObject([pdfLib.beginText(),pdfLib.setFontAndSize('F1',12),pdfLib.showText(font.encodeText('PRINT STAMP')),pdfLib.endText()],
+   {BBox:[0,0,140,20],Resources:{Font:{F1:font.ref}}});
+ pdf.getPage(29).node.addAnnot(pdf.context.register(pdf.context.obj({Type:'Annot',Subtype:'Stamp',Rect:[150,150,290,170],F:4,AP:{N:pdf.context.register(mark)}})));
  const bytes=Buffer.from(await pdf.save());
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
@@ -40,7 +48,8 @@ const server = http.createServer((req, res) => {
     addEventListener(name,fn){if(!handlers.has(name))handlers.set(name,[]);handlers.get(name).push(fn);},removeEventListener(){},releaseBuffer(){},
     postMessage(message){testMessages.push(message);
      if(message.type==='view-ready')reply({cmd:'dismiss-boot-splash'});
-     if(message.type==='output-printers')reply({cmd:'output-result',requestId:message.requestId,ok:true,printers:[{name:'QA PDF',isDefault:true,isPdf:true},{name:'QA physical sink',isPdf:false}]});
+     if(message.type==='output-resources')reply({cmd:'output-result',requestId:message.requestId,ok:true});
+     if(message.type==='output-printers')reply({cmd:'output-result',requestId:message.requestId,ok:true,printers:window.qaPrinters||[{name:'QA PDF',isDefault:true,isPdf:true},{name:'QA physical sink',isPdf:false}]});
      if(message.type==='output-put'){
       if(message.size>512*1024*1024)throw Error('Native transfer limit exceeded');
       const buffer=new ArrayBuffer(message.size);buffers.set(message.requestId,{buffer,options:message});
@@ -76,9 +85,27 @@ const server = http.createServer((req, res) => {
     try {const indexes=doc.numPages===60?[1,30,31,60]:[1,30];return await Promise.all(indexes.map(async n=>({page:n,text:(await (await doc.getPage(n)).getTextContent()).items.map(i=>i.str).join(' ')})));}finally{await doc.loadingTask.destroy();}
    },result.bytes);
    for(const item of textPages)assert.ok(item.text.includes('DRAWING PAGE '+((item.page-1)%30+1)),JSON.stringify(item));
+   if(index===0)for(const item of textPages.filter(p=>p.page===1||p.page===31))
+     assert.ok(item.text.includes('PRINT FIELD'),'Printable form disappeared on page '+item.page);
+   if(index===0){
+     assert.ok(textPages.every(p=>!p.text.includes('HIDDEN FIELD')));
+     assert.ok(textPages.filter(p=>p.page===30||p.page===60).every(p=>p.text.includes('PRINT STAMP')));
+   }
    fs.writeFileSync(path.join(output,'print-'+index+'.pdf'),data);
    results.push({printer,originalBytes:bytes.length,printBytes:data.length,pages:doc.getPageCount(),images});
   }
+  await page.evaluate(()=>{window.qaPrinters=[{name:'QA PDF',isDefault:true,isPdf:true}];});
+  await page.keyboard.press('Control+p');
+  await page.waitForFunction(()=>!document.querySelector('#prPrinter').disabled);
+  assert.equal(await page.locator('#prPrinter').inputValue(),'');
+  assert.ok(await page.locator('#prOk').isDisabled());
+  await page.locator('#prCancel').click();
+  await page.evaluate(()=>{window.qaPrinters.push({name:'QA PHYSICAL SINK',isPdf:false});});
+  await page.keyboard.press('Control+p');
+  await page.waitForFunction(()=>!document.querySelector('#prPrinter').disabled);
+  assert.equal(await page.locator('#prPrinter').inputValue(),'QA PHYSICAL SINK');
+  assert.ok(await page.locator('#prOk').isEnabled());
+  await page.locator('#prCancel').click();
   assert.deepEqual(errors,[]);fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(results,null,2));
   await page.screenshot({path:path.join(output,'30-pages-pc.png')});
   console.log('PASS 30-page desktop print UI: 60 collated PDF pages, 30 resized physical-printer pages, exact shared-buffer handoff, one shared image.');

@@ -2,6 +2,7 @@ param([switch]$Uninstall, [string]$PipePort)
 $ErrorActionPreference = 'Stop'
 if (-not $PipePort.StartsWith('\\.\pipe\DaydayPDF.Print.S-1-5-')) { throw '인쇄 포트 경로가 올바르지 않습니다.' }
 $name = 'DaydayPDF'
+$location = '이 PC'
 $oldName = 'DaydayPDF (ezPDF 고속)'
 $driver = 'MS Publisher Color Printer'
 $native = 'Microsoft Print To PDF'
@@ -135,13 +136,13 @@ try {
     }
     $current = Get-Printer -Name $name
     if ($current.Comment -in @($legacyComment, $oldComment)) { Set-Printer -Name $name -Comment ([string]::Empty) }
-    Set-Printer -Name $name -KeepPrintedJobs $true
+    Set-Printer -Name $name -KeepPrintedJobs $true -Location $location
     $device = Get-CimInstance Win32_Printer -Filter "Name='$name'"
-    if (!([int](Get-Printer -Name $name).PrinterStatus -band 1)) {
-        if ((Invoke-CimMethod -InputObject $device -MethodName Pause).ReturnValue -ne 0) { throw '인쇄 수신을 준비하지 못했습니다.' }
+    if ([int](Get-Printer -Name $name).PrinterStatus -band 1) {
+        if ((Invoke-CimMethod -InputObject $device -MethodName Resume).ReturnValue -ne 0) { throw '인쇄 대기열을 다시 시작하지 못했습니다.' }
     }
     $result = Get-Printer -Name $name
-    if ((!(Test-Marked) -or $result.DriverName -ne $driver -or $result.PortName -ne 'NUL:' -or $result.Comment -in @($legacyComment, $oldComment)) -or !$result.KeepPrintedJobs -or !([int]$result.PrinterStatus -band 1)) { throw 'DaydayPDF 프린터 등록을 확인하지 못했습니다.' }
+    if ((!(Test-Marked) -or $result.DriverName -ne $driver -or $result.PortName -ne 'NUL:' -or $result.Comment -in @($legacyComment, $oldComment)) -or !$result.KeepPrintedJobs -or ([int]$result.PrinterStatus -band 1) -or $result.Location -ne $location) { throw 'DaydayPDF 프린터 등록을 확인하지 못했습니다.' }
     if ($oldDefault -eq $name -or ($fast -and $oldDefault -eq $oldName)) {
         if ((Invoke-CimMethod -InputObject $device -MethodName SetDefaultPrinter).ReturnValue -ne 0) { throw '기본 프린터를 복원하지 못했습니다.' }
     }

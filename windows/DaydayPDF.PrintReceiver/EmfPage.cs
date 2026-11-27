@@ -210,7 +210,7 @@ internal sealed class EmfPage(VectorPdf pdf, Paper paper)
             byte[] record = new byte[4096];
             while (left > 0)
             {
-                if ((index & 127) == 0) stop.ThrowIfCancellationRequested();
+                if ((index & 127) == 0) { stop.ThrowIfCancellationRequested(); ReceiverProgress.Advanced(); }
                 Require(left >= 8 && !ended);
                 source.ReadExactly(record, 0, 8);
                 int type = I(record, 0), n = I(record, 4); Require(n >= 8 && n <= left && n <= 64 * 1024 * 1024);

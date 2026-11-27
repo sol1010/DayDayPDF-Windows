@@ -68,7 +68,19 @@ internal sealed record Paper(int PixelsX, int PixelsY, double Width, double Heig
         if (w <= 0 || h <= 0 || px < w || py < h || px >= 100000 || py >= 100000 ||
             dx is < 72 or > 9600 || dy is < 72 or > 9600 || BitConverter.ToInt16(mode, 84) != 100)
             throw new InvalidDataException("지원하지 않는 인쇄 배율 또는 용지입니다.");
-        double sx = 72d / dx, sy = 72d / dy, width = px * sx, height = py * sy;
+        double sx = 72d / dx, sy = 72d / dy;
+        var (width, height) = PhysicalSize(mode, caps);
+        double deviceW = Math.Abs(px * sx - width) < 1 ? width : px * sx;
+        double deviceH = Math.Abs(py * sy - height) < 1 ? height : py * sy;
+        double factor = Math.Max(deviceW / (w * sx), deviceH / (h * sy));
+        double left = (deviceW - w * sx * factor) / 2, top = (deviceH - h * sy * factor) / 2;
+        string matrix = $"q {VectorPdf.Num(sx * factor)} 0 0 {VectorPdf.Num(-sy * factor)} {VectorPdf.Num(left)} {VectorPdf.Num(height - top)} cm\n";
+        return new(w, h, width, height, matrix);
+    }
+
+    internal static (double Width, double Height) PhysicalSize(byte[] mode, int[] caps)
+    {
+        double width = caps[4] * 72d / caps[2], height = caps[5] * 72d / caps[3];
         int flags = BitConverter.ToInt32(mode, 72), id = BitConverter.ToInt16(mode, 78);
         (double mmW, double mmH) = (flags & 2) == 0 ? (0, 0) : id switch
         {
@@ -85,11 +97,9 @@ internal sealed record Paper(int PixelsX, int PixelsY, double Width, double Heig
         if (mmW == 0 && (flags & 12) == 12)
             (mmW, mmH) = (BitConverter.ToInt16(mode, 82) / 10d, BitConverter.ToInt16(mode, 80) / 10d);
         if (BitConverter.ToInt16(mode, 76) == 2) (mmW, mmH) = (mmH, mmW);
-        if (mmW > 0 && Math.Abs(width - mmW * 72 / 25.4) < 1 && Math.Abs(height - mmH * 72 / 25.4) < 1)
+        bool custom = ((flags & 2) == 0 || id == 0 || id >= 256) && (flags & 12) == 12;
+        if (mmW > 0 && mmH > 0 && (custom || (Math.Abs(width - mmW * 72 / 25.4) < 1 && Math.Abs(height - mmH * 72 / 25.4) < 1)))
             (width, height) = (mmW * 72 / 25.4, mmH * 72 / 25.4);
-        double factor = Math.Max(width / (w * sx), height / (h * sy));
-        double left = (width - w * sx * factor) / 2, top = (height - h * sy * factor) / 2;
-        string matrix = $"q {VectorPdf.Num(sx * factor)} 0 0 {VectorPdf.Num(-sy * factor)} {VectorPdf.Num(left)} {VectorPdf.Num(height - top)} cm\n";
-        return new(w, h, width, height, matrix);
+        return (width, height);
     }
 }

@@ -2,7 +2,11 @@ import {
   PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream,
   beginText, decodePDFRawStream, endText, popGraphicsState, pushGraphicsState,
   setFontAndSize, setTextMatrix, setTextRenderingMode, showText, TextRenderingMode,
+  concatTransformationMatrix, drawObject, fill, rectangle, setFillingRgbColor,
 } from 'pdf-lib';
+import { parseRange } from '../core/range.js';
+import { ruledTableLayout, restoreTableLines, tableReadingOrder } from './ocr-table-layout.js';
+import { inspectHiddenOcr, removeReplacedOcr, scanAppearance, scanNativeRegions, scanTextRuns, matchPreviousOcr } from './ocr-scan-layout.js';
 import { getPdfJs, openPdfJs, readFileBytes } from './pdf-task-runtime.js';
 
 export const OCR_ASSETS = Object.freeze({
@@ -196,6 +200,7 @@ export function autoContrastGrayscale(canvas) {
     image.data[offset + 3] = 255;
   }
   context.putImageData(image, 0, 0);
+  return ruledTableLayout(image);
 }
 
 async function canvasImage(canvas, quality) {
@@ -211,7 +216,7 @@ async function canvasImage(canvas, quality) {
   });
 }
 
-async function renderPageCanvas(page, dpi, maxPixels) {
+async function renderPageCanvas(page, dpi, maxPixels, omitAnnotations) {
   const base = page.getViewport({ scale: 1 });
   let scale = dpi / 72;
   const pixelCount = base.width * base.height * scale * scale;
@@ -224,7 +229,7 @@ async function renderPageCanvas(page, dpi, maxPixels) {
   if (!context) throw new Error('OCR Canvas를 만들 수 없습니다');
   context.fillStyle = '#fff';
   context.fillRect(0, 0, canvas.width, canvas.height);
-  await page.render({ canvasContext: context, viewport }).promise;
+  await page.render({ canvasContext: context, viewport, ...(omitAnnotations ? { annotationMode: 0 } : {}) }).promise;
   return { canvas, viewport };
 }
 
@@ -257,7 +262,7 @@ function languageCodes(language) {
   return ['kor', 'eng'];
 }
 
-async function createOcrWorker(language, onLog) {
+async function createOcrWorker(language, onLog, fastTable) {
   const module = await import(OCR_ASSETS.library);
   const library = module.default || module;
   let worker;
@@ -267,7 +272,8 @@ async function createOcrWorker(language, onLog) {
       worker = await library.createWorker(languageCodes(language), library.OEM.LSTM_ONLY, {
         workerPath: OCR_ASSETS.worker,
         corePath,
-        langPath: OCR_ASSETS.languages,
+        langPath: fastTable ? '/assets/ocr/tessdata_fast' : OCR_ASSETS.languages,
+        ...(fastTable ? { cachePath: 'tessdata_fast_v1' } : {}),
         gzip: true,
         logger: message => onLog?.(message),
       });
@@ -308,33 +314,107 @@ export async function recognizeOcrPage(worker, canvas, context = null) {
   return first;
 }
 
+async function recognizeTable(canvas, layout, fast, getWorker, context) {
+  const scale = fast ? layout.scale : 1;
+  const width = Math.round(canvas.width * scale), height = Math.round(canvas.height * scale);
+  const parallel = fast && layout.split && navigator.hardwareConcurrency >= 4 &&
+    (navigator.deviceMemory ?? 4) >= 4 && width * height <= 4000000;
+  const read = async index => {
+    const worker = await getWorker(index);
+    context?.throwIfCancelled();
+    let input = canvas;
+    if (scale !== 1 || parallel) {
+      input = document.createElement('canvas');
+      input.width = width;
+      input.height = height;
+      const ctx = input.getContext('2d');
+      ctx.drawImage(canvas, 0, 0, width, height);
+      if (parallel) {
+        const split = Math.round(layout.split * width / canvas.width);
+        const top = Math.round(layout.top * height / canvas.height);
+        const bottom = Math.round(layout.bottom * height / canvas.height);
+        ctx.fillStyle = '#fff';
+        if (index === 0) ctx.fillRect(split, top, width - split, bottom - top);
+        else {
+          ctx.fillRect(0, 0, width, top);
+          ctx.fillRect(0, bottom, width, height - bottom);
+          ctx.fillRect(0, top, split, bottom - top);
+        }
+      }
+    }
+    try {
+      await worker.setParameters({ tessedit_pageseg_mode: '11' });
+      const { data } = await worker.recognize(input, { rotateAuto: false }, { text: true, blocks: true });
+      const lines = restoreTableLines(getOcrTextLines(data), canvas.width / width, canvas.height / height);
+      if (!lines.length && data.text?.trim()) throw new Error('인식한 글자의 위치를 확인할 수 없습니다.');
+      return { lines, confidence: data.confidence };
+    } finally { if (input !== canvas) input.width = input.height = 1; }
+  };
+  if (!parallel) return read(0);
+  const results = await Promise.allSettled([read(0), read(1)]);
+  const failure = results.find(r => r.status === 'rejected');
+  if (failure) throw failure.reason;
+  const [left, right] = results.map(r => r.value);
+  const above = left.lines.filter(l => l.bbox.y1 <= layout.top);
+  const below = left.lines.filter(l => l.bbox.y0 >= layout.bottom);
+  const body = left.lines.filter(l => l.bbox.y1 > layout.top && l.bbox.y0 < layout.bottom);
+  return { lines: [...above, ...tableReadingOrder(body.concat(right.lines)), ...below],
+    confidence: Math.min(left.confidence, right.confidence) };
+}
+
 export async function analyzePdfForDocuments(file, {
   language = 'kor+eng',
   quality = 'balanced',
   forceOcr = false,
-  includePageImages = false,
+  includePageImages = false, pdfMode, pageRange = '', reviewPage, withDocument,
   report = () => {},
   context = null,
 } = {}) {
   const profile = checkedProfile(quality);
-  const bytes = await prepareOcrSource(await readFileBytes(file), { forceOcr });
+  const inputBytes = await readFileBytes(file);
+  const bytes = pdfMode ? inputBytes : await prepareOcrSource(inputBytes, { forceOcr });
   const pdf = await openPdfJs(bytes);
-  let worker = null;
+  const workers = new Map();
+  let fastModel = false;
+  async function releaseWorkers() {
+    const pending = [...workers.values()];
+    workers.clear();
+    await Promise.allSettled(pending.map(async task => (await task).terminate()));
+  }
+  context?.addDisposer(releaseWorkers);
   const pages = [];
+  let hiddenPages, skipReview = false;
   let lastWorkerRatio = 0;
   const workerLog = message => {
     if (!message || !Number.isFinite(message.progress)) return;
     lastWorkerRatio = message.progress;
   };
   try {
+    const selected = pageRange.trim() ? parseRange(pageRange, pdf.numPages) : null;
+    if (pageRange.trim() && !selected) throw new Error('인식할 페이지 범위를 확인하세요.');
+    const selection = selected && new Set(selected);
     for (let pageIndex = 0; pageIndex < pdf.numPages; pageIndex++) {
+      if (selection && !selection.has(pageIndex)) continue;
       context?.throwIfCancelled();
       const page = await pdf.getPage(pageIndex + 1);
       const baseProgress = pageIndex / pdf.numPages;
       const textContent = await page.getTextContent({ disableNormalization: false });
       const nativeLines = groupPdfTextItems(textContent.items);
       const nativeText = nativeLines.map(line => line.text).join('\n');
-      const needsOcr = forceOcr || shouldUseOcr(nativeText);
+      let needsOcr = forceOcr || shouldUseOcr(nativeText);
+      let hidden = [], remove = [];
+      if (pdfMode && nativeText) {
+        if (pdfMode === 'editable' || forceOcr || reviewPage) {
+          hiddenPages ||= await inspectHiddenOcr(bytes, withDocument, selection, context);
+          hidden = hiddenPages[pageIndex] || [];
+          if (hidden.length) needsOcr = true;
+        }
+        if (!needsOcr && pdfMode === 'editable') {
+          const { OPS } = await getPdfJs();
+          const ops = await page.getOperatorList({ annotationMode: 0 });
+          needsOcr = ops.fnArray.some(op => op === OPS.paintImageXObject || op === OPS.paintInlineImageXObject);
+        }
+      }
       let lines = nativeLines;
       let text = nativeText;
       let words = [];
@@ -343,25 +423,57 @@ export async function analyzePdfForDocuments(file, {
       let rendered = null;
       if (needsOcr || includePageImages) {
         const renderDpi = needsOcr ? profile.dpi : profile.imageDpi;
-        rendered = await renderPageCanvas(page, renderDpi, profile.maxPixels);
+        rendered = await renderPageCanvas(page, renderDpi, profile.maxPixels, !!pdfMode);
         if (includePageImages) image = await canvasImage(rendered.canvas, profile.imageQuality);
       }
       if (needsOcr) {
-        if (!worker) {
-          report(baseProgress, '한국어·영어 OCR 엔진 준비 중');
-          worker = await createOcrWorker(language, workerLog);
-          context?.addDisposer(() => worker?.terminate());
+        const original = rendered.canvas;
+        let recognition = original;
+        if (pdfMode === 'editable' || reviewPage) {
+          recognition = document.createElement('canvas');
+          recognition.width = original.width; recognition.height = original.height;
+          recognition.getContext('2d', { willReadFrequently: true }).drawImage(original, 0, 0);
         }
-        autoContrastGrayscale(rendered.canvas);
-        lastWorkerRatio = 0;
-        const result = await recognizeOcrPage(worker, rendered.canvas, context);
-        lines = mapOcrLinesToPdf(getOcrTextLines(result.data), rendered.viewport);
+        let rawLines;
+        try {
+          const layout = autoContrastGrayscale(recognition);
+          const fast = !!layout && quality !== 'high';
+          if (fast !== fastModel) { await releaseWorkers(); fastModel = fast; }
+          function getWorker(index) {
+            context?.throwIfCancelled();
+            if (!workers.has(index)) {
+              report(baseProgress, '한국어·영어 OCR 엔진 준비 중');
+              workers.set(index, createOcrWorker(language, workerLog, fast));
+            }
+            return workers.get(index);
+          }
+          lastWorkerRatio = 0;
+          if (layout) {
+            ({ lines: rawLines, confidence } = await recognizeTable(recognition, layout, fast, getWorker, context));
+          } else {
+            const worker = await getWorker(0);
+            context?.throwIfCancelled();
+            const { data } = await recognizeOcrPage(worker, recognition, context);
+            rawLines = getOcrTextLines(data);
+            if (!rawLines.length && data.text?.trim()) throw new Error('인식한 글자의 위치를 확인할 수 없습니다.');
+            confidence = Number(data.confidence) || 0;
+          }
+        } finally { if (recognition !== original) recognition.width = recognition.height = 1; }
+        const runs = pdfMode ? scanTextRuns(rawLines, scanNativeRegions(textContent, rendered.viewport, hidden)) : rawLines;
+        lines = mapOcrLinesToPdf(runs, rendered.viewport);
+        if (pdfMode) {
+          ({ lines, remove } = matchPreviousOcr(lines, hidden, !forceOcr));
+          lines = lines.map(line => ({ ...line, text: line.text.normalize('NFC'), words: [],
+            appearance: pdfMode === 'editable' ? scanAppearance(original, line.bbox, rendered.viewport) : null }));
+          if (reviewPage && lines.length && !skipReview) {
+            const review = await reviewPage({ pageNumber: pageIndex + 1, lines, canvas: original });
+            context?.throwIfCancelled();
+            lines = lines.map((line, i) => ({ ...line, text: review.texts[i] }));
+            skipReview = review.skipRemaining;
+          }
+        }
         text = lines.map(line => line.text).join('\n');
         words = lines.flatMap(line => line.words || []);
-        if (!lines.length && String(result.data.text || '').trim()) {
-          throw new Error('검색용 텍스트의 위치를 확인할 수 없습니다. 원본 PDF로 다시 시도하세요.');
-        }
-        confidence = Number(result.data.confidence) || 0;
       }
       pages.push(Object.freeze({
         index: pageIndex,
@@ -372,6 +484,7 @@ export async function analyzePdfForDocuments(file, {
         words: Object.freeze(words),
         confidence,
         ocrApplied: needsOcr,
+        remove,
         image,
       }));
       if (rendered) {
@@ -382,12 +495,10 @@ export async function analyzePdfForDocuments(file, {
       report((pageIndex + Math.max(.15, lastWorkerRatio * .8) + .05) / pdf.numPages,
         `${pageIndex + 1}/${pdf.numPages}페이지 ${needsOcr ? '문자 인식' : '텍스트 확인'} 완료`);
     }
-    return Object.freeze({ bytes, pages: Object.freeze(pages), pageCount: pdf.numPages });
+    const cleaned = pdfMode ? await removeReplacedOcr(bytes, pages, withDocument) : bytes;
+    return Object.freeze({ bytes: cleaned, pages: Object.freeze(pages), pageCount: pdf.numPages });
   } finally {
-    if (worker) {
-      try { await worker.terminate(); } catch {}
-      worker = null;
-    }
+    await releaseWorkers();
     try { await pdf.loadingTask.destroy(); } catch {}
   }
 }
@@ -398,7 +509,25 @@ async function fetchBytes(path, label) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-export async function createSearchablePdf(sourceBytes, pages, { report = () => {} } = {}) {
+function visibleTextMatrix(face, text, origin, right, top) {
+  const { glyphs } = face.layout(text);
+  let left = Infinity, bottom = Infinity, r = -Infinity, upper = -Infinity, x = 0;
+  for (let i = 0; i < glyphs.length; i++) {
+    const g = glyphs[i], box = g.bbox;
+    if (box.maxX > box.minX && box.maxY > box.minY) {
+      left = Math.min(left, x + box.minX); r = Math.max(r, x + box.maxX);
+      bottom = Math.min(bottom, box.minY); upper = Math.max(upper, box.maxY);
+    }
+    x += g.advanceWidth;
+  }
+  if (!(r > left && upper > bottom)) return null;
+  const ax = (right[0] - origin[0]) / (r - left), ay = (right[1] - origin[1]) / (r - left);
+  const bx = (top[0] - origin[0]) / (upper - bottom), by = (top[1] - origin[1]) / (upper - bottom);
+  return [ax * face.unitsPerEm, ay * face.unitsPerEm, bx * face.unitsPerEm, by * face.unitsPerEm,
+    origin[0] - ax * left - bx * bottom, origin[1] - ay * left - by * bottom];
+}
+
+export async function createSearchablePdf(sourceBytes, pages, { report = () => {}, editable = false } = {}) {
   const ocrPages = pages.filter(page => page.ocrApplied && page.lines?.some(line => validBox(line.pdfBox)));
   if (!ocrPages.length) return sourceBytes.slice();
   const [{ default: fontkit }, fontBytes] = await Promise.all([
@@ -407,41 +536,73 @@ export async function createSearchablePdf(sourceBytes, pages, { report = () => {
   ]);
   const document = await PDFDocument.load(sourceBytes, { updateMetadata: false });
   document.registerFontkit(fontkit);
-  const font = await document.embedFont(fontBytes, { subset: true });
+  const font = await document.embedFont(fontBytes, { subset: !editable });
+  const face = editable ? fontkit.create(fontBytes) : null;
   for (let index = 0; index < ocrPages.length; index++) {
     const pageResult = ocrPages[index];
     const page = document.getPage(pageResult.index);
     const fontName = page.node.newFontDictionary('DaydayOCR', font.ref);
-    const operators = [pushGraphicsState(), beginText(), setTextRenderingMode(TextRenderingMode.Invisible)];
+    const operators = [pushGraphicsState()];
     for (const line of pageResult.lines) {
-      if (!validBox(line.pdfBox) || !line.text) continue;
+      if (!validBox(line.pdfBox)) continue;
+      const patch = line.appearance;
+      if (patch) {
+        operators.push(pushGraphicsState(), concatTransformationMatrix(...patch.matrix));
+        if (patch.paper) operators.push(setFillingRgbColor(...patch.paper.map(v => v / 255)), rectangle(0, 0, 1, 1), fill());
+        else {
+          const background = await document.embedPng(patch.png);
+          operators.push(drawObject(page.node.newXObject('OCRPaper', background.ref)));
+        }
+        operators.push(popGraphicsState());
+      }
+      if (!line.text) continue;
       const box = line.pdfBox;
       const origin = line.pdfOrigin || [box.x0, box.y0];
       const right = line.pdfRight || [box.x1, box.y0];
       const top = line.pdfTop || [box.x0, box.y1];
       const height = Math.hypot(top[0] - origin[0], top[1] - origin[1]);
+      if (patch && face) {
+        const matrix = visibleTextMatrix(face, line.text, patch.ink.origin, patch.ink.right, patch.ink.top);
+        if (matrix) {
+          const size = Math.hypot(matrix[2], matrix[3]);
+          const [a,b,c,d,x,y] = matrix;
+          operators.push(beginText(), setTextRenderingMode(TextRenderingMode.Fill), setFillingRgbColor(...patch.color.map(v => v / 255)),
+            setFontAndSize(fontName, size), setTextMatrix(a/size,b/size,c/size,d/size,x,y), showText(font.encodeText(line.text)), endText());
+          continue;
+        }
+      }
       const size = height / font.heightAtSize(1);
       const textWidth = font.widthOfTextAtSize(line.text, size);
       if (!Number.isFinite(textWidth) || textWidth <= 0) continue;
       const descent = font.heightAtSize(size) - font.heightAtSize(size, { descender: false });
       const upX = (top[0] - origin[0]) / height;
       const upY = (top[1] - origin[1]) / height;
-      operators.push(
+      operators.push(beginText(), setTextRenderingMode(TextRenderingMode.Invisible),
         setFontAndSize(fontName, size),
         setTextMatrix((right[0] - origin[0]) / textWidth, (right[1] - origin[1]) / textWidth,
           upX, upY, origin[0] + upX * descent, origin[1] + upY * descent),
-        showText(font.encodeText(line.text)),
+        showText(font.encodeText(line.text)), endText(),
       );
     }
-    operators.push(endText(), popGraphicsState());
+    operators.push(popGraphicsState());
     const layer = document.context.register(document.context.contentStream(operators));
     page.node.normalize();
     page.node.addContentStream(layer);
-    page.node.set(OCR_LAYER, layer);
+    if (!editable) page.node.set(OCR_LAYER, layer);
     report((index + 1) / ocrPages.length, `${pageResult.index + 1}페이지 검색 텍스트 적용 중`);
   }
   document.setProducer('DaydayPDF OCR 2');
   return new Uint8Array(await document.save({ useObjectStreams: true }));
+}
+
+export async function correctRecognizedText(source, pageIndex, objectIndex, line, withDocument) {
+  const input = await PDFDocument.load(source, { updateMetadata: false });
+  const output = await PDFDocument.create();
+  const [page] = await output.copyPages(input, [pageIndex]);
+  output.addPage(page);
+  const bytes = await output.save();
+  const updated = line.text ? await createSearchablePdf(bytes, [{ index: 0, ocrApplied: true, lines: [line] }]) : bytes;
+  return removeReplacedOcr(updated, [{ index: 0, remove: [objectIndex], replaceAt: line.text ? objectIndex : undefined }], withDocument);
 }
 
 export async function inspectPdfText(file) {

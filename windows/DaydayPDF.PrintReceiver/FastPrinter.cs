@@ -12,7 +12,7 @@ internal static class FastPrinter
 {
     private const string Queue = "DaydayPDF";
     private const string Driver = "MS Publisher Color Printer";
-    private const uint Spooling = 8, Removing = 4 | 256;
+    private const uint Spooling = 8, Printing = 16, Removing = 4 | 256, Finished = 128 | 4096 | 8192;
     [StructLayout(LayoutKind.Sequential)]
     private struct Defaults { public IntPtr Type, Mode; public uint Access; }
     [StructLayout(LayoutKind.Sequential)]
@@ -24,7 +24,7 @@ internal static class FastPrinter
         public ushort Year, Month, DayOfWeek, Day, Hour, Minute, Second, Millisecond;
         public uint Elapsed, Printed;
     }
-    private sealed record Job(uint Id, string Key, string Title, uint Pages, DateTime Submitted, string DataType, byte[] Mode);
+    private sealed record Job(uint Id, string Key, string Title, uint Pages, uint Size, DateTime Submitted, string DataType, byte[] Mode);
     private sealed class PrinterHandle : SafeHandleZeroOrMinusOneIsInvalid
     {
         public PrinterHandle() : base(true) { }
@@ -60,7 +60,8 @@ internal static class FastPrinter
             submittedBy.Equals(Environment.UserName, StringComparison.OrdinalIgnoreCase)) ||
             !Text(data.Printer).Equals(Queue, StringComparison.OrdinalIgnoreCase) ||
             !Text(data.Driver).Equals(Driver, StringComparison.OrdinalIgnoreCase) ||
-            (data.Status & (Spooling | Removing)) != 0 || (data.Size == 0 && data.Pages == 0)) return null;
+            (data.Status & (Spooling | Removing)) != 0 || ((data.Status & Printing) != 0 && (data.Status & Finished) == 0) ||
+            (data.Size == 0 && data.Pages == 0)) return null;
         var submitted = new DateTime(data.Year, data.Month, data.Day, data.Hour, data.Minute, data.Second, data.Millisecond, DateTimeKind.Utc);
         string key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{PrintInbox.UserKey}/{data.Id}/{submitted.Ticks}")))[..32];
         byte[] mode = [];
@@ -69,7 +70,7 @@ internal static class FastPrinter
             int n = unchecked((ushort)Marshal.ReadInt16(data.Mode, 68)) + unchecked((ushort)Marshal.ReadInt16(data.Mode, 70));
             if (n is >= 166 and <= 131072) { mode = new byte[n]; Marshal.Copy(data.Mode, mode, 0, n); }
         }
-        return new(data.Id, key, Text(data.Document), data.Pages, submitted, Text(data.Type), mode);
+        return new(data.Id, key, Text(data.Document), data.Pages, data.Size, submitted, Text(data.Type), mode);
     }
     private static List<Job> Jobs(PrinterHandle h, string owner)
     {
@@ -110,6 +111,7 @@ internal static class FastPrinter
             try
             {
                 if (!ReadPrinter(handle, IntPtr.Add(pin.AddrOfPinnedObject(), offset), (uint)count, out uint n)) throw new Win32Exception();
+                if (n > 0) ReceiverProgress.Advanced();
                 return checked((int)n);
             }
             finally { pin.Free(); }
@@ -199,7 +201,7 @@ internal static class FastPrinter
         }
         EmfPage.Require(pages > 0 && pageStart < 0 && (expected == 0 || expected == pages));
     }
-    private static void Receive(PrinterHandle printer, Job job, string owner, Action<string> open, CancellationToken stop)
+    private static void Receive(PrinterHandle printer, Job job, string owner, Action<string> open, HashSet<string> delivered, CancellationToken stop)
     {
         void ReadJob(Action<Stream> read)
         {
@@ -210,7 +212,7 @@ internal static class FastPrinter
         string template = PrintInbox.NewPath(job.Title);
         string path = Path.Combine(PrintInbox.Root, Path.GetFileNameWithoutExtension(template)[..^49] + "_" + job.Submitted.ToLocalTime().ToString("yyyyMMdd_HHmmss") + "_" + job.Key + ".pdf");
         string staging = path + ".partial.pdf";
-        if (!File.Exists(path))
+        if (!delivered.Contains(job.Key) && !File.Exists(path))
         {
             if (File.Exists(staging)) File.Delete(staging);
             try
@@ -258,6 +260,7 @@ internal static class FastPrinter
                     {
                         File.Delete(staging);
                         if (!Current(printer, job, owner)) return;
+                        ReceiverProgress.At(ReceiverStage.Converting, job.Id);
                         using var replay = new WindowsPdfReplay(staging, job.Title);
                         ReadJob(source => ReadPages(source, job.Mode, job.Pages, replay.ReadFonts, stop, ignoreModeChanges: true));
                         ReadJob(source => ReadPages(source, job.Mode, job.Pages, replay.Page, stop, true));
@@ -272,32 +275,60 @@ internal static class FastPrinter
         stop.ThrowIfCancellationRequested();
         if (Current(printer, job, owner))
         {
-            open(path);
+            if (!delivered.Contains(job.Key))
+            {
+                ReceiverProgress.At(ReceiverStage.Opening, job.Id);
+                open(path);
+                delivered.Add(job.Key);
+            }
+            ReceiverProgress.At(ReceiverStage.Acknowledging, job.Id);
             if (!SetJob(printer, job.Id, 0, IntPtr.Zero, 5)) throw new Win32Exception();
         }
     }
 
-    internal static async Task Listen(Action<string> open, Action<Exception> log, CancellationToken stop)
+    internal sealed record Retry(uint Size, uint Pages, int Attempts, long Next, bool Notified)
+    {
+        internal bool Wait(uint size, uint pages, long now) => size == Size && pages == Pages && now < Next;
+        internal static Retry After(Retry? previous, uint size, uint pages, long now)
+        {
+            int attempts = previous?.Size == size && previous.Pages == pages ? Math.Min(6, previous.Attempts + 1) : 1;
+            int delay = attempts switch { 1 => 2000, 2 => 8000, 3 => 30000, _ => 120000 };
+            return new(size, pages, attempts, now + delay, previous?.Notified == true || attempts >= 3);
+        }
+    }
+
+    internal static async Task Listen(Action<string> open, Action<Exception> log, uint deferredJob, CancellationToken stop)
     {
         string owner = WindowsIdentity.GetCurrent().Name;
-        var failed = new Dictionary<string, int>();
+        var failed = new Dictionary<string, Retry>();
+        var delivered = new HashSet<string>();
         while (!stop.IsCancellationRequested)
         {
             try
             {
+                ReceiverProgress.At(ReceiverStage.Queue);
                 using var printer = Open(Queue, 8);
                 var jobs = Jobs(printer, owner);
-                foreach (string gone in failed.Keys.Except(jobs.Select(j => j.Key)).ToArray()) failed.Remove(gone);
+                var active = jobs.Select(j => j.Key).ToHashSet();
+                delivered.IntersectWith(active);
+                foreach (string gone in failed.Keys.Except(active).ToArray()) failed.Remove(gone);
+                if (deferredJob != 0 && jobs.Count > 1) jobs = jobs.OrderBy(j => j.Id == deferredJob).ToList();
                 foreach (var job in jobs)
                 {
-                    if (failed.GetValueOrDefault(job.Key) >= 3) continue;
-                    try { Receive(printer, job, owner, open, stop); }
+                    failed.TryGetValue(job.Key, out var previous);
+                    if (previous?.Wait(job.Size, job.Pages, Environment.TickCount64) == true) continue;
+                    stop.ThrowIfCancellationRequested();
+                    ReceiverProgress.At(ReceiverStage.Reading, job.Id);
+                    try { Receive(printer, job, owner, open, delivered, stop); failed.Remove(job.Key); }
                     catch (Exception e) when (e is not OperationCanceledException)
                     {
-                        int attempts = e is InvalidDataException ? 3 : failed.GetValueOrDefault(job.Key) + 1;
-                        failed[job.Key] = attempts; log(e);
-                        if (attempts == 3) _ = Task.Run(() => MessageBox(IntPtr.Zero, "PDF 변환을 완료하지 못했습니다. 원래 인쇄 작업은 DaydayPDF 대기열에 보관했습니다.", "DaydayPDF 인쇄", 0x30));
+                        var next = Retry.After(previous, job.Size, job.Pages, Environment.TickCount64);
+                        failed[job.Key] = next;
+                        if (next.Attempts <= 3) log(new IOException($"인쇄 작업 {job.Id} · {e.GetType().Name}: {e.Message}", e));
+                        if (next.Attempts == 3 && previous?.Notified != true)
+                            _ = Task.Run(() => MessageBox(IntPtr.Zero, $"인쇄 작업 {job.Id}을 처리하지 못했습니다. 대기열에 보관하고 자동으로 다시 시도합니다.\n\n{e.Message}", "DaydayPDF 인쇄", 0x30));
                     }
+                    finally { ReceiverProgress.At(ReceiverStage.Queue); }
                 }
             }
             catch (Win32Exception e) when (e.NativeErrorCode == 1801) { await Task.Delay(15000, stop); }

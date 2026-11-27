@@ -9,26 +9,17 @@ namespace DaydayPDF.PrintReceiver;
 
 internal static class Program
 {
-    private static string EventName(string suffix) => @"Local\DaydayPDF.PrintReceiver." + PrintInbox.UserKey + "." + suffix;
-
     public static int Main(string[] args)
     {
-        if (args.Contains("--stop"))
+        try
         {
-            try { using var stop = EventWaitHandle.OpenExisting(EventName("Stop")); using var stopped = EventWaitHandle.OpenExisting(EventName("Stopped")); stop.Set(); return stopped.WaitOne(20000) ? 0 : 1; }
-            catch (WaitHandleCannotBeOpenedException) { return 0; }
+            if (args is ["--stop"]) return ReceiverSupervisor.Stop();
+            if (args is ["--worker", var token, var parent, var deferred] && Guid.TryParseExact(token, "N", out _)
+                && int.TryParse(parent, out int pid) && uint.TryParse(deferred, out uint job))
+                return ReceiverSupervisor.Worker(token, pid, job);
+            return args.Length == 0 ? ReceiverSupervisor.Run() : 1;
         }
-        using var mutex = new Mutex(false, EventName("Mutex"), out bool created);
-        if (!created) return 0;
-        using var stopEvent = new EventWaitHandle(false, EventResetMode.ManualReset, EventName("Stop"));
-        using var stoppedEvent = new EventWaitHandle(false, EventResetMode.ManualReset, EventName("Stopped"));
-        using var ready = new EventWaitHandle(false, EventResetMode.ManualReset, EventName("Ready"));
-        using var cancellation = new CancellationTokenSource();
-        var registration = ThreadPool.RegisterWaitForSingleObject(stopEvent, (_, _) => cancellation.Cancel(), null, Timeout.Infinite, true);
-        try { RunAsync(ready, cancellation.Token).GetAwaiter().GetResult(); return 0; }
-        catch (OperationCanceledException) { return 0; }
         catch (Exception error) { Log(error); return 1; }
-        finally { registration.Unregister(null); ready.Reset(); stoppedEvent.Set(); }
     }
 
     private static NamedPipeServerStream CreatePipe()
@@ -42,12 +33,29 @@ internal static class Program
             PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 65536, 0, security);
     }
 
-    private static async Task RunAsync(EventWaitHandle ready, CancellationToken stop)
+    internal static async Task RunAsync(EventWaitHandle ready, uint deferredJob, CancellationToken stop)
+    {
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(stop);
+        var pipes = ListenPipeAsync(cancel.Token);
+        var queue = Task.Run(() => FastPrinter.Listen(OpenInEditor, Log, deferredJob, cancel.Token));
+        ready.Set();
+        try
+        {
+            await await Task.WhenAny(pipes, queue);
+            stop.ThrowIfCancellationRequested();
+            throw new IOException("인쇄 수신 대기가 종료되었습니다.");
+        }
+        finally
+        {
+            cancel.Cancel();
+            if (stop.IsCancellationRequested) await Task.WhenAll(pipes, queue);
+        }
+    }
+
+    private static async Task ListenPipeAsync(CancellationToken stop)
     {
         var active = new List<Task>();
         var waiting = CreatePipe();
-        var fast = Task.Run(() => FastPrinter.Listen(OpenInEditor, Log, stop), stop);
-        ready.Set();
         try
         {
             while (!stop.IsCancellationRequested)
@@ -60,7 +68,7 @@ internal static class Program
                 active.Add(HandleAsync(connected, stop));
             }
         }
-        finally { waiting.Dispose(); await Task.WhenAll(active); if (stop.IsCancellationRequested) await fast; }
+        finally { waiting.Dispose(); if (stop.IsCancellationRequested) await Task.WhenAll(active); }
     }
 
     private static async Task HandleAsync(NamedPipeServerStream pipe, CancellationToken stop)
